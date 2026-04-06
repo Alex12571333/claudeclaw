@@ -1,65 +1,37 @@
 # ClaudeClaw
 
-ClaudeClaw — это project-scoped плагин для Claude Code, который запускает агента как фоновый демон, работает через Telegram, выполняет heartbeat-задачи по интервалу и запускает планировщик задач из markdown-файлов.
+ClaudeClaw — это плагин для Claude Code, который запускает проектного агента в фоне, поддерживает Telegram-бота, heartbeat-задачи и задачи по расписанию.
 
-Этот форк сфокусирован на следующем:
+Плагин работает внутри текущего проекта и хранит своё состояние локально в `.claude/claudeclaw/`.
 
-- русский интерфейс
-- Telegram как основной канал
-- без Discord
-- без web UI
-- модель и провайдер берутся из самого Claude Code
+## Возможности
 
-## Что умеет
-
-- запускает фоновый демон внутри текущего проекта
-- использует одну общую Claude-сессию для демона и Telegram-диалога
-- поддерживает heartbeat-промпты по интервалу
-- поддерживает cron-подобные задачи из `.claude/claudeclaw/jobs/*.md`
-- поддерживает Telegram: текст, изображения, документы и голосовые сообщения
-- показывает компактную statusline внутри Claude Code
-
-## Важно
-
-ClaudeClaw больше не выбирает модель и провайдера самостоятельно.
-
-Он использует то, что уже настроено в Claude Code. Это значит:
-
-- если Claude Code работает через Anthropic, ClaudeClaw тоже работает через Anthropic
-- если Claude Code работает через MiniMax, ClaudeClaw тоже работает через MiniMax
-- если ты позже поменяешь провайдера в Claude Code, ClaudeClaw автоматически подхватит это изменение
-
-ClaudeClaw больше не подставляет свои `ANTHROPIC_*` переменные и не переключает провайдера внутри себя.
+- фоновый daemon-режим для Claude Code
+- Telegram-бот для общения с агентом
+- heartbeat по интервалу
+- задачи по расписанию из markdown-файлов
+- общая Claude-сессия для фоновых задач и Telegram
+- наследование модели и провайдера из Claude Code
 
 ## Установка из GitHub
 
-После того как ты загрузишь этот форк в GitHub, установить его в Claude Code можно так:
+Внутри Claude Code:
 
 ```text
-/plugin marketplace add ТВОЙ_GITHUB_ЛОГИН/claudeclaw
+/plugin marketplace add Alex12571333/claudeclaw
 /plugin install claudeclaw
 /reload-plugins
 ```
 
-Потом в нужном проекте запусти:
+После установки открой нужный проект и запусти:
 
 ```text
 /claudeclaw:start
 ```
 
-Замени `ТВОЙ_GITHUB_ЛОГИН/claudeclaw` на свой реальный GitHub-репозиторий.
-
 ## Локальная установка
 
-Если хочешь установить плагин из локальной папки до публикации в GitHub:
-
-```text
-/plugin marketplace add /абсолютный/путь/до/claudeclaw
-/plugin install claudeclaw@claudeclaw
-/reload-plugins
-```
-
-Пример:
+Если нужно установить эту версию из локальной папки:
 
 ```text
 /plugin marketplace add /Users/aleksandrbogdanov/Downloads/myopenagent/claudeclaw
@@ -69,9 +41,9 @@ ClaudeClaw больше не подставляет свои `ANTHROPIC_*` пе�
 
 ## Требования
 
-- установленный Claude Code
-- установленный `bun`
-- установленный `node`
+- `claude`
+- `bun`
+- `node`
 
 Проверка:
 
@@ -81,9 +53,45 @@ bun --version
 node --version
 ```
 
+## Первый запуск
+
+Открой Claude Code именно в папке проекта и выполни:
+
+```text
+/claudeclaw:start
+```
+
+Мастер запуска поможет настроить:
+
+- heartbeat
+- Telegram bot token
+- Telegram user ID
+- режим безопасности
+
+## Telegram-команды
+
+Встроенные команды бота:
+
+- `/start` — приветствие
+- `/new` — новая сессия
+- `/status` — статус текущей сессии
+- `/context` — использование контекстного окна
+
+## Как работает модель
+
+ClaudeClaw не выбирает модель сам.
+
+Он использует ту модель и того провайдера, которые уже настроены в Claude Code. Если в Claude Code включён MiniMax, ClaudeClaw автоматически будет работать через MiniMax. Если в Claude Code стоит другой провайдер, ClaudeClaw будет использовать его.
+
 ## Пример настройки MiniMax для Claude Code
 
-Если хочешь, чтобы Claude Code и ClaudeClaw работали через MiniMax, настраивать нужно сам Claude Code в `~/.claude/settings.json`:
+Файл:
+
+```text
+~/.claude/settings.json
+```
+
+Содержимое:
 
 ```json
 {
@@ -103,46 +111,20 @@ node --version
 
 Примечания:
 
-- международный endpoint: `https://api.minimax.io/anthropic`
-- endpoint для Китая: `https://api.minimaxi.com/anthropic`
+- для международного региона используй `https://api.minimax.io/anthropic`
+- для Китая используй `https://api.minimaxi.com/anthropic`
 - переменные окружения shell имеют приоритет над `~/.claude/settings.json`
 
-После изменения настроек Claude Code полностью перезапусти `claude`.
+После изменения настроек полностью перезапусти `claude`.
 
-## Первый запуск
+## Структура файлов
 
-Открой Claude Code прямо в папке проекта и выполни:
+ClaudeClaw использует:
 
-```text
-/claudeclaw:start
-```
-
-Мастер запуска поможет настроить:
-
-- heartbeat-интервал
-- Telegram bot token
-- разрешённые Telegram user ID
-- режим безопасности
-
-## Команды Telegram-бота
-
-Встроенные команды Telegram-бота:
-
-- `/start` — показать приветствие
-- `/new` — сбросить общую сессию и начать заново
-- `/status` — показать статус текущей сессии
-- `/context` — показать использование контекстного окна
-
-Кроме этого, в Telegram могут автоматически появляться дополнительные slash-команды из установленных skills Claude Code.
-
-## Файлы проекта
-
-ClaudeClaw хранит данные проекта здесь:
-
-- `.claude/claudeclaw/settings.json` — настройки плагина
-- `.claude/claudeclaw/jobs/*.md` — задачи по расписанию
-- `.claude/claudeclaw/logs/` — логи запусков
-- `.claude/claudeclaw/session.json` — общая Claude-сессия
+- `.claude/claudeclaw/settings.json` — настройки
+- `.claude/claudeclaw/session.json` — общая сессия
+- `.claude/claudeclaw/jobs/*.md` — задачи
+- `.claude/claudeclaw/logs/` — логи
 
 ## Пример settings.json
 
@@ -171,11 +153,11 @@ ClaudeClaw хранит данные проекта здесь:
 ## Режимы безопасности
 
 - `locked` — только чтение и поиск
-- `strict` — без bash и web tools
+- `strict` — без bash и web-инструментов
 - `moderate` — полный набор инструментов в пределах проекта
-- `unrestricted` — полный доступ без project-scoping
+- `unrestricted` — полный доступ без ограничений директорией
 
-## Задачи
+## Задачи по расписанию
 
 Каждая задача — это markdown-файл в `.claude/claudeclaw/jobs/`:
 
@@ -186,31 +168,20 @@ schedule: "0 9 * * *"
 Проверь репозиторий и кратко напиши, если есть что-то важное.
 ```
 
-## Как опубликовать
+## Публикация своего форка
 
-Если хочешь, чтобы люди ставили этот форк так же легко, как оригинальный плагин:
-
-1. Загрузи этот репозиторий в GitHub.
-2. Оставь `.claude-plugin/plugin.json` и `.claude-plugin/marketplace.json` в корне репозитория.
-3. После этого пользователи смогут установить его так:
+Если ты форкнул проект и хочешь, чтобы он ставился так же легко:
 
 ```text
-/plugin marketplace add ТВОЙ_GITHUB_ЛОГИН/claudeclaw
+/plugin marketplace add ТВОЙ_ЛОГИН/claudeclaw
 /plugin install claudeclaw
 ```
 
-## Текущее состояние форка
+Главное, чтобы в репозитории оставались:
 
-Этот форк теперь сфокусирован на:
+- `.claude-plugin/plugin.json`
+- `.claude-plugin/marketplace.json`
 
-- daemon-режиме для Claude Code
-- Telegram-интеграции
-- автоматизации и задачах по расписанию
-- наследовании провайдера и модели из Claude Code
+## Состояние проекта
 
-В форке больше нет:
-
-- Discord-интеграции
-- встроенного роутинга моделей
-- переключения провайдера на стороне плагина
-- web dashboard
+ClaudeClaw — это Telegram-first daemon-плагин для Claude Code с автоматизацией, heartbeat-задачами и наследованием провайдера из Claude Code.
