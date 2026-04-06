@@ -1,5 +1,5 @@
 ---
-description: Show heartbeat plugin help
+description: Показать справку по плагину
 ---
 
 Display this help information to the user:
@@ -23,7 +23,6 @@ Display this help information to the user:
 - `bun run src/index.ts start --trigger` — start daemon and run startup trigger once
 - `bun run src/index.ts start --prompt "text" --trigger` — start daemon and run startup trigger with custom prompt
 - Add `--telegram` with `--trigger` to forward startup trigger output to configured Telegram users
-- Add `--web` (optional `--web-port 4632`) to start a local dashboard with the daemon
 
 **Send command options (CLI):**
 - `bun run src/index.ts send "text"` — send to active daemon session
@@ -38,7 +37,6 @@ Display this help information to the user:
 
 **Configuration:**
 - `.claude/claudeclaw/settings.json` — Main config (heartbeat, telegram, security)
-- `.claude/claudeclaw/settings.json` — Main config (heartbeat, telegram, security, web)
 - `.claude/claudeclaw/jobs/*.md` — Cron jobs with schedule frontmatter and a prompt body
 
 **Job file format:**

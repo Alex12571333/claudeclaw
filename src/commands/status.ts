@@ -10,13 +10,13 @@ const SETTINGS_FILE = join(HEARTBEAT_DIR, "settings.json");
 const JOBS_DIR = join(HEARTBEAT_DIR, "jobs");
 
 function formatCountdown(ms: number): string {
-  if (ms <= 0) return "now!";
+  if (ms <= 0) return "сейчас";
   const s = Math.floor(ms / 1000);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m`;
-  return "<1m";
+  return "<1м";
 }
 
 function decodePath(encoded: string): string {
@@ -54,13 +54,13 @@ async function showAll(): Promise<void> {
   const daemons = await findAllDaemons();
 
   if (daemons.length === 0) {
-    console.log(`\x1b[31m○ No running daemons found\x1b[0m`);
+    console.log(`\x1b[31m○ Запущенные демоны не найдены\x1b[0m`);
     return;
   }
 
-  console.log(`Found ${daemons.length} running daemon(s):\n`);
+  console.log(`Найдено демонов в работе: ${daemons.length}\n`);
   for (const d of daemons) {
-    console.log(`\x1b[32m● Running\x1b[0m PID ${d.pid} — ${d.path}`);
+    console.log(`\x1b[32m● Работает\x1b[0m PID ${d.pid} — ${d.path}`);
   }
 }
 
@@ -76,11 +76,11 @@ async function showStatus(): Promise<boolean> {
   }
 
   if (!daemonRunning) {
-    console.log(`\x1b[31m○ Daemon is not running\x1b[0m`);
+    console.log(`\x1b[31m○ Демон не запущен\x1b[0m`);
     return false;
   }
 
-  console.log(`\x1b[32m● Daemon is running\x1b[0m (PID ${pid})`);
+  console.log(`\x1b[32m● Демон запущен\x1b[0m (PID ${pid})`);
 
   try {
     const settings = await Bun.file(SETTINGS_FILE).json();
@@ -91,11 +91,11 @@ async function showStatus(): Promise<boolean> {
         : Intl.DateTimeFormat().resolvedOptions().timeZone || "system";
     const windows = Array.isArray(hb?.excludeWindows) ? hb.excludeWindows : [];
     console.log(
-      `  Heartbeat: ${hb.enabled ? `every ${hb.interval}m` : "disabled"}`
+      `  Heartbeat: ${hb.enabled ? `каждые ${hb.interval} мин.` : "выключен"}`
     );
     if (hb.enabled) {
-      console.log(`  Heartbeat timezone: ${timezone}`);
-      console.log(`  Quiet windows: ${windows.length > 0 ? windows.length : "none"}`);
+      console.log(`  Часовой пояс heartbeat: ${timezone}`);
+      console.log(`  Тихие часы: ${windows.length > 0 ? windows.length : "нет"}`);
     }
   } catch {}
 
@@ -103,11 +103,11 @@ async function showStatus(): Promise<boolean> {
     const files = await readdir(JOBS_DIR);
     const mdFiles = files.filter((f) => f.endsWith(".md"));
     if (mdFiles.length > 0) {
-      console.log(`  Jobs: ${mdFiles.length}`);
+      console.log(`  Задач: ${mdFiles.length}`);
       for (const f of mdFiles) {
         const content = await Bun.file(join(JOBS_DIR, f)).text();
         const match = content.match(/schedule:\s*["']?([^"'\n]+)/);
-        const schedule = match ? match[1].trim() : "unknown";
+        const schedule = match ? match[1].trim() : "неизвестно";
         console.log(`    - ${f.replace(/\.md$/, "")} [${schedule}]`);
       }
     }
@@ -119,7 +119,7 @@ async function showStatus(): Promise<boolean> {
     console.log("");
     if (state.heartbeat) {
       console.log(
-        `  \x1b[31m♥\x1b[0m Next heartbeat: ${formatCountdown(state.heartbeat.nextAt - now)}`
+        `  \x1b[31m♥\x1b[0m Следующий heartbeat: ${formatCountdown(state.heartbeat.nextAt - now)}`
       );
     }
     for (const job of state.jobs || []) {

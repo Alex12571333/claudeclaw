@@ -1,5 +1,5 @@
 ---
-description: Start daemon mode or run one-shot prompt/trigger
+description: Запустить демон или выполнить разовый запуск по промпту/триггеру
 ---
 
 Start the heartbeat daemon for this project. Follow these steps exactly:
@@ -36,7 +36,6 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
 3. **Check existing config**: Read `.claude/claudeclaw/settings.json` (if it exists). Determine which sections are already configured:
    - **Heartbeat configured** = `heartbeat.enabled` is `true` AND `heartbeat.prompt` is non-empty
    - **Telegram configured** = `telegram.token` is non-empty
-   - **Discord configured** = `discord.token` is non-empty
    - **Security configured** = `security.level` exists and is not `"moderate"` (the default), OR `security.allowedTools`/`security.disallowedTools` are non-empty
 
 4. **Interactive setup — smart mode** (BEFORE launching the daemon):
@@ -44,10 +43,10 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
    **If ALL three sections are already configured**, show a summary of the current config and ask ONE question:
 
    Use AskUserQuestion:
-   - "Your settings are already configured. Want to change anything?" (header: "Settings", options: "Keep current settings", "Reconfigure")
+   - "Настройки уже заполнены. Хочешь что-нибудь изменить?" (header: "Настройки", options: "Оставить как есть", "Перенастроить")
 
-   If they choose "Keep current settings", skip to step 6 (first contact question).
-   If they choose "Reconfigure", proceed to step 5 below as if nothing was configured.
+   If they choose "Оставить как есть", skip to step 6 (first contact question).
+   If they choose "Перенастроить", proceed to step 5 below as if nothing was configured.
 
    **If SOME sections are configured and others are not**, show the already-configured sections as a summary, then only ask about the unconfigured sections in step 5.
 
@@ -57,30 +56,20 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
 
    Use **AskUserQuestion** to ask all unconfigured sections at once (up to 3 questions in one call):
 
-   - **Model** (always ask if `model` is empty/unset): "Which Claude model should ClaudeClaw use?" (header: "Model", options: "opus (default)", "sonnet", "haiku", "glm")
-   - **If heartbeat is NOT configured**: "Enable heartbeat? Example: I can remind you to drink water every 30 minutes, or you can fully customize what runs." (header: "Heartbeat", options: "Yes" / "No")
-   - **If Telegram is NOT configured**: "Configure Telegram? Recommended if you want it 24/7 live." (header: "Telegram", options: "Yes" / "No")
-   - **If Discord is NOT configured**: "Configure Discord? Connect your bot to Discord servers." (header: "Discord", options: "Yes" / "No")
-   - **If security is NOT configured**: "What security level for Claude?" (header: "Security", options:
-     - "Moderate (Recommended)" (description: "Full access scoped to project directory")
-     - "Locked" (description: "Read-only — can only search and read files, no edits, bash, or web")
-     - "Strict" (description: "Can edit files but no bash or web access")
-     - "Unrestricted" (description: "Full access with no directory restriction — dangerous"))
+   - **If heartbeat is NOT configured**: "Включить heartbeat? Например, я могу напоминать пить воду каждые 30 минут, либо ты сможешь настроить свои сценарии." (header: "Хартбит", options: "Да" / "Нет")
+   - **If Telegram is NOT configured**: "Настроить Telegram? Рекомендуется, если нужен доступ к агенту 24/7." (header: "Телеграм", options: "Да" / "Нет")
+   - **If security is NOT configured**: "Какой уровень доступа выдать Claude?" (header: "Безопасность", options:
+     - "Умеренный (Рекомендуется)" (description: "Полный доступ в пределах папки проекта")
+     - "Заблокированный" (description: "Только чтение: поиск и просмотр файлов без правок, bash и web")
+     - "Строгий" (description: "Можно редактировать файлы, но без bash и web")
+     - "Без ограничений" (description: "Полный доступ без ограничения директорией — опасно"))
 
    Then, based on their answers:
 
-   - **Model**: Set `model` in settings to their choice (e.g. `"opus"`, `"sonnet"`, `"haiku"`, `"glm"`). Default is `"opus"` if they don't pick.
-   - **If model is `glm`**: Ask in normal free-form text for API token and set top-level `api` to that value (optional; user can skip). Only ask this token question when the selected model is `glm`.
-
-   - **Agentic mode**: Use AskUserQuestion to ask:
-     - "Enable agentic model routing? This automatically selects models based on task type using configurable modes." (header: "Agentic", options: "Yes — default modes (Recommended)", "No — use single model")
-     - If "Yes": Set `agentic.enabled` to `true` with default modes (planning→opus, implementation→sonnet). The user can customize modes later via `/config`.
-     - If "No": Set `agentic.enabled` to `false`.
-   - Ask whether to set a fallback model. Recommend `glm` first so fallback uses a different provider path than the primary Claude model. If yes, set `fallback.model` and optionally `fallback.api`.
-   - Ask whether to enable GLM fallback (kicks in automatically when your Claude token limit is hit). The fallback model is always `glm` — no other model is supported. Use AskUserQuestion: "Enable GLM fallback? Automatically switches to GLM when your Claude limit is hit." (header: "Fallback", options: "Yes — enable GLM fallback", "Skip"). If yes, ask in normal free-form text for the GLM API token (optional, user can skip). Set `fallback.model` to `"glm"` and `fallback.api` to the token if provided.
+   - **Model**: Do not ask for a model. ClaudeClaw should use whatever model is already configured in Claude Code.
 
    - **If yes to heartbeat**: Use AskUserQuestion again with one question:
-     - "How often should it run in minutes?" (header: "Interval", options: "5", "15", "30 (Recommended)", "60")
+     - "Как часто запускать heartbeat? Укажи интервал в минутах." (header: "Интервал", options: "5", "15", "30 (Рекомендуется)", "60")
      - Set `heartbeat.enabled` to `true` and `heartbeat.interval` to their answer.
      - Ask for timezone as simple UTC offset text (example: `UTC+1`, `UTC-5`, `UTC+03:30`) and set top-level `timezone`.
    - **If heartbeat is no but `timezone` is missing**: set top-level `timezone` to `UTC+0`.
@@ -89,15 +78,7 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
      - Telegram bot token (hint: create/get it from `@BotFather`)
      - Allowed Telegram user IDs (hint: use `@userinfobot` to get your numeric ID)
      - Set `telegram.token` and `telegram.allowedUserIds` (as array of numbers) accordingly.
-     - Note: Telegram bot runs in-process with the daemon. All components (heartbeat, cron, telegram, discord) share one Claude session.
-
-   - **If yes to Discord**: Do NOT use AskUserQuestion for Discord fields. Ask in normal free-form text for two values (both optional, user can skip either):
-     - Discord bot token (hint: create a bot at https://discord.com/developers/applications → Bot → Token. Enable **Message Content Intent** under Privileged Gateway Intents.)
-     - Allowed Discord user IDs (hint: enable Developer Mode in Discord settings → right-click your profile → Copy User ID). These are large numbers — they will be stored as strings.
-     - Set `discord.token` and `discord.allowedUserIds` (as array of strings) accordingly.
-     - Listen channel IDs (optional — hint: right-click a channel in Discord with Developer Mode enabled → Copy Channel ID). Channels where the bot responds to all messages without requiring an @mention.
-     - Set `discord.listenChannels` (as array of strings) accordingly.
-     - Note: Discord bot connects via WebSocket gateway in-process with the daemon. It supports DMs, guild mentions/replies, slash commands (/start, /reset), voice messages, and image attachments. `discord.allowedUserIds` is an allowlist that applies to messages, slash commands, and button interactions.
+     - Note: Telegram bot runs in-process with the daemon. Heartbeat, cron, and Telegram all share one Claude session.
 
    - **Security level mapping** — set `security.level` in settings based on their choice:
      - "Locked" → `"locked"`
@@ -106,26 +87,21 @@ Start the heartbeat daemon for this project. Follow these steps exactly:
      - "Unrestricted" → `"unrestricted"`
 
    - **If security is "Strict" or "Locked"**: Use AskUserQuestion to ask:
-     - "Allow any specific tools on top of the security level? (e.g. Bash(git:*) to allow only git commands)" (header: "Allow tools", options: "None — use level defaults (Recommended)", "Bash(git:*) — git only", "Bash(git:*) Bash(npm:*) — git + npm")
+     - "Разрешить какие-то инструменты сверх выбранного уровня? Например, `Bash(git:*)`, чтобы оставить только git-команды." (header: "Инструменты", options: "Нет, оставить настройки уровня (Рекомендуется)", "Bash(git:*) — только git", "Bash(git:*) Bash(npm:*) — git и npm")
      - If they pick an option with tools or type custom ones, set `security.allowedTools` to the list.
 
    Update `.claude/claudeclaw/settings.json` with their answers.
 
 6. **Launch/start action**:
    ```bash
-   mkdir -p .claude/claudeclaw/logs && nohup bun run ${CLAUDE_PLUGIN_ROOT}/src/index.ts start --web > .claude/claudeclaw/logs/daemon.log 2>&1 & echo $!
+   mkdir -p .claude/claudeclaw/logs && nohup bun run ${CLAUDE_PLUGIN_ROOT}/src/index.ts start > .claude/claudeclaw/logs/daemon.log 2>&1 & echo $!
    ```
    Use the description "Starting ClaudeClaw server" for this command.
    Wait 1 second, then check `cat .claude/claudeclaw/logs/daemon.log`. If it contains "Aborted: daemon already running", tell the user and exit.
-   - Read `.claude/claudeclaw/settings.json` for `web.port` (default `4632` if missing) and `web.host` (default `127.0.0.1`).
-   - Then try to open the dashboard directly:
-     - Linux: `xdg-open http://<HOST>:<PORT>`
-     - macOS: `open http://<HOST>:<PORT>`
-     - If open command fails, print the URL clearly so user can open it manually.
 
-7. **Capture session ID**: Read `.claude/claudeclaw/session.json` and extract the `sessionId` field. This is the shared Claude session used by the daemon for heartbeat, jobs, Telegram, and Discord.
+7. **Capture session ID**: Read `.claude/claudeclaw/session.json` and extract the `sessionId` field. This is the shared Claude session used by the daemon for heartbeat, jobs, and Telegram.
 
-8. **Report**: Print the ASCII art below then show the PID, session, status info, Telegram bot next step, and the Web UI URL.
+8. **Report**: Print the ASCII art below then show the PID, session, status info, and Telegram bot next step.
 
 CRITICAL: Output the ASCII art block below EXACTLY as-is inside a markdown code block. Do NOT re-indent, re-align, or adjust ANY whitespace. Copy every character verbatim. Only replace `<PID>` and `<WORKING_DIR>` with actual values.
 
@@ -136,32 +112,21 @@ CRITICAL: Output the ASCII art block below EXACTLY as-is inside a markdown code 
     ▘▘ ▝▝
 ```
 
-# HELLO, I AM YOUR CLAUDECLAW!
-**Daemon is running! PID: \<PID> | Dir: \<WORKING_DIR>**
+# ПРИВЕТ, Я ТВОЙ CLAUDECLAW!
+**Демон запущен! PID: \<PID> | Папка: \<WORKING_DIR>**
 
 ```
-/heartbeat:status  - check status
-/heartbeat:stop    - stop daemon
-/heartbeat:clear   - back up session & restart fresh
-/heartbeat:config  - show config
+/heartbeat:status  - показать статус
+/heartbeat:stop    - остановить демон
+/heartbeat:clear   - сбросить сессию и начать заново
+/heartbeat:config  - показать настройки
 ```
 
-**To start chatting on Telegram**
-Go to your bot, send `/start`, and start talking.
+**Чтобы начать общение в Telegram**
+Открой своего бота, отправь `/start` и просто напиши сообщение.
 
-**To start chatting on Discord**
-DM your bot directly — no server invite needed: `https://discord.com/users/<DISCORD_BOT_ID>`
-Or mention it in any server it's in. Use `/start` and `/reset` slash commands.
-To get `<DISCORD_BOT_ID>`: read the daemon log for the bot's user ID (shown in the "Ready as <name> (<ID>)" line).
-
-**To talk to your agent directly on Claude Code**
+**Чтобы общаться с агентом прямо в Claude Code**
 `cd <WORKING_DIR> && claude --resume <SESSION_ID>`
-
-Show this direct Web UI URL:
-```bash
-http://<WEB_HOST>:<WEB_PORT>
-```
-Defaults: `WEB_HOST=127.0.0.1`, `WEB_PORT=4632` unless changed via settings or `--web-port`.
 
 ---
 
@@ -170,29 +135,6 @@ Defaults: `WEB_HOST=127.0.0.1`, `WEB_PORT=4632` unless changed via settings or `
 ### Settings — `.claude/claudeclaw/settings.json`
 ```json
 {
-  "model": "opus",
-  "api": "",
-  "fallback": {
-    "model": "glm",
-    "api": ""
-  },
-  "agentic": {
-    "enabled": true,
-    "defaultMode": "implementation",
-    "modes": [
-      {
-        "name": "planning",
-        "model": "opus",
-        "keywords": ["plan", "design", "architect", "research", "analyze", "think", "evaluate", "review"],
-        "phrases": ["how should i", "what's the best way to", "help me decide"]
-      },
-      {
-        "name": "implementation",
-        "model": "sonnet",
-        "keywords": ["implement", "code", "write", "fix", "deploy", "test", "commit"]
-      }
-    ]
-  },
   "timezone": "UTC+0",
   "heartbeat": {
     "enabled": true,
@@ -205,11 +147,6 @@ Defaults: `WEB_HOST=127.0.0.1`, `WEB_PORT=4632` unless changed via settings or `
     "token": "123456:ABC-DEF...",
     "allowedUserIds": [123456789]
   },
-  "discord": {
-    "token": "MTIz...",
-    "allowedUserIds": ["123456789012345678"],
-    "listenChannels": ["987654321098765432"]
-  },
   "security": {
     "level": "moderate",
     "allowedTools": [],
@@ -217,13 +154,6 @@ Defaults: `WEB_HOST=127.0.0.1`, `WEB_PORT=4632` unless changed via settings or `
   }
 }
 ```
-- `model` — Claude model to use (`opus`, `sonnet`, `haiku`, `glm`, or full model ID). Empty string uses default. Ignored when `agentic.enabled` is true.
-- `api` — API token used when `model` is `glm` (passed as `ANTHROPIC_AUTH_TOKEN` for that provider path).
-- `fallback.model` — backup model used automatically if the primary run returns a rate-limit message. Prefer `glm` for provider diversity.
-- `fallback.api` — optional API token to use with `fallback.model`.
-- `agentic.enabled` — when true, automatically routes tasks to appropriate models based on task type
-- `agentic.defaultMode` — which mode to use when no keywords match (default: `"implementation"`)
-- `agentic.modes` — array of routing modes, each with: `name` (string), `model` (string), `keywords` (string[]), optional `phrases` (string[], checked before keywords with higher priority). Old `planningModel`/`implementationModel` format is auto-converted.
 - `timezone` — canonical app timezone as UTC offset text (example: `UTC+1`, `UTC-5`, `UTC+03:30`). Heartbeat windows, jobs, and UI all use this timezone.
 - `heartbeat.enabled` — whether the recurring heartbeat runs
 - `heartbeat.interval` — minutes between heartbeat runs
@@ -231,9 +161,6 @@ Defaults: `WEB_HOST=127.0.0.1`, `WEB_PORT=4632` unless changed via settings or `
 - Heartbeat template override (optional) — create `.claude/claudeclaw/prompts/HEARTBEAT.md` to replace the built-in heartbeat template for this project.
 - `telegram.token` — Telegram bot token from @BotFather
 - `telegram.allowedUserIds` — array of numeric Telegram user IDs allowed to interact
-- `discord.token` — Discord bot token from the Developer Portal
-- `discord.allowedUserIds` — array of string Discord user IDs (snowflakes) allowed to interact
-- `discord.listenChannels` — array of string channel IDs where the bot responds to all messages without requiring an @mention
 - `security.level` — one of: `locked`, `strict`, `moderate`, `unrestricted`
 - `security.allowedTools` — extra tools to allow on top of the level (e.g. `["Bash(git:*)"]`)
 - `security.disallowedTools` — tools to block on top of the level

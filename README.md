@@ -1,145 +1,216 @@
-<p align="center">
-  <img src="images/claudeclaw-banner.svg" alt="ClaudeClaw Banner" />
-</p>
-<p align="center">
-  <img src="images/claudeclaw-wordmark.png" alt="ClaudeClaw Wordmark" />
-</p>
+# ClaudeClaw
 
-<p align="center">
-  <img src="https://awesome.re/badge.svg" alt="Awesome" />
-  <a href="https://github.com/moazbuilds/ClaudeClaw/stargazers">
-    <img src="https://img.shields.io/github/stars/moazbuilds/ClaudeClaw?style=flat-square&color=f59e0b" alt="GitHub Stars" />
-  </a>
-  <a href="https://github.com/moazbuilds/ClaudeClaw">
-    <img src="https://img.shields.io/badge/downloads-~10k-2da44e?style=flat-square" alt="Downloads ~10k" />
-  </a>
-  <a href="https://github.com/moazbuilds/ClaudeClaw/commits/master">
-    <img src="https://img.shields.io/github/last-commit/moazbuilds/ClaudeClaw?style=flat-square&color=0ea5e9" alt="Last Commit" />
-  </a>
-  <a href="https://github.com/moazbuilds/ClaudeClaw/graphs/contributors">
-    <img src="https://img.shields.io/github/contributors/moazbuilds/ClaudeClaw?style=flat-square&color=a855f7" alt="Contributors" />
-  </a>
-  <a href="https://x.com/moazbuilds">
-    <img src="https://img.shields.io/badge/X-%40moazbuilds-000000?style=flat-square&logo=x" alt="X @moazbuilds" />
-  </a>
-</p>
+ClaudeClaw — это project-scoped плагин для Claude Code, который запускает агента как фоновый демон, работает через Telegram, выполняет heartbeat-задачи по интервалу и запускает планировщик задач из markdown-файлов.
 
-<p align="center"><b>A lightweight, open-source OpenClaw version built into your Claude Code.</b></p>
+Этот форк сфокусирован на следующем:
 
-ClaudeClaw turns your Claude Code into a personal assistant that never sleeps. It runs as a background daemon, executing tasks on a schedule, responding to messages on Telegram and Discord, transcribing voice commands, and integrating with any service you need.
+- русский интерфейс
+- Telegram как основной канал
+- без Discord
+- без web UI
+- модель и провайдер берутся из самого Claude Code
 
-> Note: Please don't use ClaudeClaw for hacking any bank system or doing any illegal activities. Thank you.
+## Что умеет
 
-## Why ClaudeClaw?
+- запускает фоновый демон внутри текущего проекта
+- использует одну общую Claude-сессию для демона и Telegram-диалога
+- поддерживает heartbeat-промпты по интервалу
+- поддерживает cron-подобные задачи из `.claude/claudeclaw/jobs/*.md`
+- поддерживает Telegram: текст, изображения, документы и голосовые сообщения
+- показывает компактную statusline внутри Claude Code
 
-| Category | ClaudeClaw | OpenClaw |
-| --- | --- | --- |
-| Anthropic Will Come After You | No | Yes |
-| API Overhead | Directly uses your Claude Code subscription | Nightmare |
-| Setup & Installation | ~5 minutes | Nightmare |
-| Deployment | Install Claude Code on any device or VPS and run | Nightmare |
-| Isolation Model | Folder-based and isolated as needed | Global by default (security nightmare) |
-| Reliability | Simple reliable system for agents | Bugs nightmare |
-| Feature Scope | Lightweight features you actually use | 600k+ LOC nightmare |
-| Security | Average Claude Code usage | Nightmare |
-| Cost Efficiency | Efficient usage | Nightmare |
-| Memory | Uses Claude internal memory system + `CLAUDE.md` | Nightmare |
+## Важно
 
-## Getting Started in 5 Minutes
+ClaudeClaw больше не выбирает модель и провайдера самостоятельно.
 
-```bash
-claude plugin marketplace add moazbuilds/claudeclaw
-claude plugin install claudeclaw
+Он использует то, что уже настроено в Claude Code. Это значит:
+
+- если Claude Code работает через Anthropic, ClaudeClaw тоже работает через Anthropic
+- если Claude Code работает через MiniMax, ClaudeClaw тоже работает через MiniMax
+- если ты позже поменяешь провайдера в Claude Code, ClaudeClaw автоматически подхватит это изменение
+
+ClaudeClaw больше не подставляет свои `ANTHROPIC_*` переменные и не переключает провайдера внутри себя.
+
+## Установка из GitHub
+
+После того как ты загрузишь этот форк в GitHub, установить его в Claude Code можно так:
+
+```text
+/plugin marketplace add ТВОЙ_GITHUB_ЛОГИН/claudeclaw
+/plugin install claudeclaw
+/reload-plugins
 ```
-Then open a Claude Code session and run:
-```
+
+Потом в нужном проекте запусти:
+
+```text
 /claudeclaw:start
 ```
-The setup wizard walks you through model, heartbeat, Telegram, Discord, and security, then your daemon is live with a web dashboard.
 
-## What Would Be Built Next?
+Замени `ТВОЙ_GITHUB_ЛОГИН/claudeclaw` на свой реальный GitHub-репозиторий.
 
-> **Mega Post:** Help shape the next ClaudeClaw features.
-> Vote, suggest ideas, and discuss priorities in **[this post](https://github.com/moazbuilds/claudeclaw/issues/14)**.
+## Локальная установка
 
-<p align="center">
-  <a href="https://github.com/moazbuilds/claudeclaw/issues/14">
-    <img src="https://img.shields.io/badge/Roadmap-Mega%20Post-blue?style=for-the-badge&logo=github" alt="Roadmap Mega Post" />
-  </a>
-</p>
+Если хочешь установить плагин из локальной папки до публикации в GitHub:
 
-## Features
+```text
+/plugin marketplace add /абсолютный/путь/до/claudeclaw
+/plugin install claudeclaw@claudeclaw
+/reload-plugins
+```
 
-### Automation
-- **Heartbeat:** Periodic check-ins with configurable intervals, quiet hours, and editable prompts.
-- **Cron Jobs:** Timezone-aware schedules for repeating or one-time tasks with reliable execution.
+Пример:
 
-### Communication
-- **Telegram:** Text, image, and voice support.
-- **Discord:** DMs, server mentions/replies, slash commands, voice messages, and image attachments.
-- **Time Awareness:** Message time prefixes help the agent understand delays and daily patterns.
+```text
+/plugin marketplace add /Users/aleksandrbogdanov/Downloads/myopenagent/claudeclaw
+/plugin install claudeclaw@claudeclaw
+/reload-plugins
+```
 
-### Multi-Session Threads (Discord)
-- **Independent Thread Sessions:** Each Discord thread gets its own Claude CLI session, fully isolated from the main channel.
-- **Parallel Processing:** Thread conversations run concurrently — messages in different threads don't block each other.
-- **Auto-Create:** First message in a new thread automatically bootstraps a fresh session. No setup needed.
-- **Session Cleanup:** Thread sessions are automatically cleaned up when threads are deleted or archived.
-- **Backward Compatible:** DMs and main channel messages continue using the global session.
+## Требования
 
-See [docs/MULTI_SESSION.md](docs/MULTI_SESSION.md) for technical details.
+- установленный Claude Code
+- установленный `bun`
+- установленный `node`
 
-### Reliability and Control
-- **GLM Fallback:** Automatically continue with GLM models if your primary limit is reached.
-- **Web Dashboard:** Manage jobs, monitor runs, and inspect logs in real time.
-- **Security Levels:** Four access levels from read-only to full system access.
-- **Model Selection:** Switch models based on your workload.
+Проверка:
 
-## FAQ
+```bash
+claude --version
+bun --version
+node --version
+```
 
-<details open>
-  <summary><strong>Can ClaudeClaw do &lt;something&gt;?</strong></summary>
-  <p>
-    If Claude Code can do it, ClaudeClaw can do it too. ClaudeClaw adds cron jobs,
-    heartbeats, and Telegram/Discord bridges on top. You can also give your ClaudeClaw new
-    skills and teach it custom workflows.
-  </p>
-</details>
+## Пример настройки MiniMax для Claude Code
 
-<details open>
-  <summary><strong>Is this project breaking Anthropic ToS?</strong></summary>
-  <p>
-    No. ClaudeClaw is local usage inside the Claude Code ecosystem. It wraps Claude Code
-    directly and does not require third-party OAuth outside that flow.
-    If you build your own scripts to do the same thing, it would be the same.
-  </p>
-</details>
+Если хочешь, чтобы Claude Code и ClaudeClaw работали через MiniMax, настраивать нужно сам Claude Code в `~/.claude/settings.json`:
 
-<details open>
-  <summary><strong>Will Anthropic sue you for building ClaudeClaw?</strong></summary>
-  <p>
-    I hope not.
-  </p>
-</details>
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.minimax.io/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "<MINIMAX_API_KEY>",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1,
+    "ANTHROPIC_MODEL": "MiniMax-M2.7",
+    "ANTHROPIC_SMALL_FAST_MODEL": "MiniMax-M2.7",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "MiniMax-M2.7",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "MiniMax-M2.7",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M2.7"
+  }
+}
+```
 
-<details open>
-  <summary><strong>Are you ready to change this project name?</strong></summary>
-  <p>
-    If it bothers Anthropic, I might rename it to OpenClawd. Not sure yet.
-  </p>
-</details>
+Примечания:
 
-## Screenshots
+- международный endpoint: `https://api.minimax.io/anthropic`
+- endpoint для Китая: `https://api.minimaxi.com/anthropic`
+- переменные окружения shell имеют приоритет над `~/.claude/settings.json`
 
-### Claude Code Folder-Based Status Bar
-![Claude Code folder-based status bar](images/bar.png)
+После изменения настроек Claude Code полностью перезапусти `claude`.
 
-### Cool UI to Manage and Check Your ClaudeClaw
-![Cool UI to manage and check your ClaudeClaw](images/dashboard.png)
+## Первый запуск
 
-## Contributors
+Открой Claude Code прямо в папке проекта и выполни:
 
-Thanks for helping make ClaudeClaw better.
+```text
+/claudeclaw:start
+```
 
-<a href="https://github.com/moazbuilds/claudeclaw/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=moazbuilds/claudeclaw" />
-</a>
+Мастер запуска поможет настроить:
+
+- heartbeat-интервал
+- Telegram bot token
+- разрешённые Telegram user ID
+- режим безопасности
+
+## Команды Telegram-бота
+
+Встроенные команды Telegram-бота:
+
+- `/start` — показать приветствие
+- `/new` — сбросить общую сессию и начать заново
+- `/status` — показать статус текущей сессии
+- `/context` — показать использование контекстного окна
+
+Кроме этого, в Telegram могут автоматически появляться дополнительные slash-команды из установленных skills Claude Code.
+
+## Файлы проекта
+
+ClaudeClaw хранит данные проекта здесь:
+
+- `.claude/claudeclaw/settings.json` — настройки плагина
+- `.claude/claudeclaw/jobs/*.md` — задачи по расписанию
+- `.claude/claudeclaw/logs/` — логи запусков
+- `.claude/claudeclaw/session.json` — общая Claude-сессия
+
+## Пример settings.json
+
+```json
+{
+  "timezone": "UTC+0",
+  "heartbeat": {
+    "enabled": true,
+    "interval": 30,
+    "prompt": "Проверь последние изменения и скажи, есть ли что-то важное.",
+    "excludeWindows": [],
+    "forwardToTelegram": true
+  },
+  "telegram": {
+    "token": "123456:ABC-DEF...",
+    "allowedUserIds": [123456789]
+  },
+  "security": {
+    "level": "moderate",
+    "allowedTools": [],
+    "disallowedTools": []
+  }
+}
+```
+
+## Режимы безопасности
+
+- `locked` — только чтение и поиск
+- `strict` — без bash и web tools
+- `moderate` — полный набор инструментов в пределах проекта
+- `unrestricted` — полный доступ без project-scoping
+
+## Задачи
+
+Каждая задача — это markdown-файл в `.claude/claudeclaw/jobs/`:
+
+```markdown
+---
+schedule: "0 9 * * *"
+---
+Проверь репозиторий и кратко напиши, если есть что-то важное.
+```
+
+## Как опубликовать
+
+Если хочешь, чтобы люди ставили этот форк так же легко, как оригинальный плагин:
+
+1. Загрузи этот репозиторий в GitHub.
+2. Оставь `.claude-plugin/plugin.json` и `.claude-plugin/marketplace.json` в корне репозитория.
+3. После этого пользователи смогут установить его так:
+
+```text
+/plugin marketplace add ТВОЙ_GITHUB_ЛОГИН/claudeclaw
+/plugin install claudeclaw
+```
+
+## Текущее состояние форка
+
+Этот форк теперь сфокусирован на:
+
+- daemon-режиме для Claude Code
+- Telegram-интеграции
+- автоматизации и задачах по расписанию
+- наследовании провайдера и модели из Claude Code
+
+В форке больше нет:
+
+- Discord-интеграции
+- встроенного роутинга моделей
+- переключения провайдера на стороне плагина
+- web dashboard

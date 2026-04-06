@@ -1,5 +1,5 @@
 ---
-description: Show heartbeat daemon status
+description: Показать статус демона heartbeat
 ---
 
 Show the current status of the heartbeat daemon. Check all of the following:

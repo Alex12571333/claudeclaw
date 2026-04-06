@@ -1,5 +1,5 @@
 ---
-description: Show recent heartbeat logs
+description: Показать последние логи heartbeat
 ---
 
 Show recent heartbeat daemon logs. Use `$ARGUMENTS` to filter or limit results.

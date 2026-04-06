@@ -1,5 +1,5 @@
 ---
-description: Clear session and start fresh
+description: Сбросить сессию и начать заново
 ---
 
 Clear the current Claude session by backing it up and restarting the daemon with a fresh session.

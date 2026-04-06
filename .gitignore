@@ -2,3 +2,5 @@
 node_modules
 .codemachine
 AGENTS.md
+.DS_Store
+CLAUDE.md

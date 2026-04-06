@@ -8,7 +8,6 @@ import { clearJobSchedule, loadJobs } from "../jobs";
 import { writePidFile, cleanupPidFile, checkExistingDaemon } from "../pid";
 import { initConfig, loadSettings, reloadSettings, resolvePrompt, type HeartbeatConfig, type Settings } from "../config";
 import { getDayAndMinuteAtOffset } from "../timezone";
-import { startWebUi, type WebServerHandle } from "../web";
 import type { Job } from "../jobs";
 
 const CLAUDE_DIR = join(process.cwd(), ".claude");
@@ -33,7 +32,7 @@ const RED = "\\x1b[31m";
 const GREEN = "\\x1b[32m";
 
 function fmt(ms) {
-  if (ms <= 0) return GREEN + "now!" + R;
+  if (ms <= 0) return GREEN + "сейчас!" + R;
   var s = Math.floor(ms / 1000);
   var h = Math.floor(s / 3600);
   var m = Math.floor((s % 3600) / 60);
@@ -62,7 +61,7 @@ var FOOTER = BL + H.repeat(30) + BR;
 if (!alive()) {
   process.stdout.write(
     HEADER + "\\n" +
-    B + "        " + RED + "\\u25cb offline" + R + "              " + B + "\\n" +
+    B + "      " + RED + "\\u25cb не запущен" + R + "            " + B + "\\n" +
     FOOTER
   );
   process.exit(0);
@@ -78,15 +77,11 @@ try {
   }
 
   var jc = (state.jobs || []).length;
-  info.push("\\ud83d\\udccb " + jc + " job" + (jc !== 1 ? "s" : ""));
-  info.push(GREEN + "\\u25cf live" + R);
+  info.push("\\ud83d\\udccb " + jc + " зад.");
+  info.push(GREEN + "\\u25cf активен" + R);
 
   if (state.telegram) {
     info.push(GREEN + "\\ud83d\\udce1" + R);
-  }
-
-  if (state.discord) {
-    info.push(GREEN + "\\ud83c\\udfae" + R);
   }
 
   var mid = " " + info.join(" " + B + " ") + " ";
@@ -95,7 +90,7 @@ try {
 } catch {
   process.stdout.write(
     HEADER + "\\n" +
-    B + DIM + "         waiting...         " + R + B + "\\n" +
+    B + DIM + "        ожидание...        " + R + B + "\\n" +
     FOOTER
   );
 }
@@ -199,11 +194,8 @@ export async function start(args: string[] = []) {
   let hasPromptFlag = false;
   let hasTriggerFlag = false;
   let telegramFlag = false;
-  let discordFlag = false;
   let debugFlag = false;
-  let webFlag = false;
   let replaceExistingFlag = false;
-  let webPortFlag: number | null = null;
   const payloadParts: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -214,59 +206,33 @@ export async function start(args: string[] = []) {
       hasTriggerFlag = true;
     } else if (arg === "--telegram") {
       telegramFlag = true;
-    } else if (arg === "--discord") {
-      discordFlag = true;
     } else if (arg === "--debug") {
       debugFlag = true;
-    } else if (arg === "--web") {
-      webFlag = true;
     } else if (arg === "--replace-existing") {
       replaceExistingFlag = true;
-    } else if (arg === "--web-port") {
-      const raw = args[i + 1];
-      if (!raw) {
-        console.error("`--web-port` requires a numeric value.");
-        process.exit(1);
-      }
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 65535) {
-        console.error("`--web-port` must be a valid TCP port (1-65535).");
-        process.exit(1);
-      }
-      webPortFlag = parsed;
-      i++;
     } else {
       payloadParts.push(arg);
     }
   }
   const payload = payloadParts.join(" ").trim();
   if (hasPromptFlag && !payload) {
-    console.error("Usage: claudeclaw start --prompt <prompt> [--trigger] [--telegram] [--discord] [--debug] [--web] [--web-port <port>] [--replace-existing]");
+    console.error("Использование: claudeclaw start --prompt <текст> [--trigger] [--telegram] [--debug] [--replace-existing]");
     process.exit(1);
   }
   if (!hasPromptFlag && payload) {
-    console.error("Prompt text requires `--prompt`.");
+    console.error("Текст запроса нужно передавать через `--prompt`.");
     process.exit(1);
   }
   if (telegramFlag && !hasTriggerFlag) {
-    console.error("`--telegram` with `start` requires `--trigger`.");
+    console.error("Флаг `--telegram` с `start` требует `--trigger`.");
     process.exit(1);
   }
-  if (discordFlag && !hasTriggerFlag) {
-    console.error("`--discord` with `start` requires `--trigger`.");
-    process.exit(1);
-  }
-  if (hasPromptFlag && !hasTriggerFlag && (webFlag || webPortFlag !== null)) {
-    console.error("`--web` is daemon-only. Remove `--prompt`, or add `--trigger`.");
-    process.exit(1);
-  }
-
   // One-shot mode: explicit prompt without trigger.
   if (hasPromptFlag && !hasTriggerFlag) {
     const existingPid = await checkExistingDaemon();
     if (existingPid) {
       console.error(`\x1b[31mAborted: daemon already running in this directory (PID ${existingPid})\x1b[0m`);
-      console.error("Use `claudeclaw send <message> [--telegram] [--discord]` while daemon is running.");
+      console.error("Пока демон запущен, используйте `claudeclaw send <сообщение> [--telegram]`.");
       process.exit(1);
     }
 
@@ -282,12 +248,12 @@ export async function start(args: string[] = []) {
   const existingPid = await checkExistingDaemon();
   if (existingPid) {
     if (!replaceExistingFlag) {
-      console.error(`\x1b[31mAborted: daemon already running in this directory (PID ${existingPid})\x1b[0m`);
-      console.error(`Use --stop first, or kill PID ${existingPid} manually.`);
+      console.error(`\x1b[31mОстановлено: в этой папке уже запущен демон (PID ${existingPid})\x1b[0m`);
+      console.error(`Сначала выполните --stop или завершите PID ${existingPid} вручную.`);
       process.exit(1);
     }
 
-    console.log(`Replacing existing daemon (PID ${existingPid})...`);
+    console.log(`Заменяю текущий демон (PID ${existingPid})...`);
     try {
       process.kill(existingPid, "SIGTERM");
     } catch {
@@ -311,17 +277,11 @@ export async function start(args: string[] = []) {
   const settings = await loadSettings();
   await ensureProjectClaudeMd();
   const jobs = await loadJobs();
-  const webEnabled = webFlag || webPortFlag !== null || settings.web.enabled;
-  const webPort = webPortFlag ?? settings.web.port;
 
   await setupStatusline();
   await writePidFile();
-  let web: WebServerHandle | null = null;
-  let discordStopGateway: (() => void) | null = null;
 
   async function shutdown() {
-    if (discordStopGateway) discordStopGateway();
-    if (web) web.stop();
     await teardownStatusline();
     await cleanupPidFile();
     process.exit(0);
@@ -329,17 +289,16 @@ export async function start(args: string[] = []) {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 
-  console.log("ClaudeClaw daemon started");
+  console.log("Демон ClaudeClaw запущен");
   console.log(`  PID: ${process.pid}`);
-  console.log(`  Security: ${settings.security.level}`);
+  console.log(`  Безопасность: ${settings.security.level}`);
   if (settings.security.allowedTools.length > 0)
-    console.log(`    + allowed: ${settings.security.allowedTools.join(", ")}`);
+    console.log(`    + разрешено: ${settings.security.allowedTools.join(", ")}`);
   if (settings.security.disallowedTools.length > 0)
-    console.log(`    - blocked: ${settings.security.disallowedTools.join(", ")}`);
-  console.log(`  Heartbeat: ${settings.heartbeat.enabled ? `every ${settings.heartbeat.interval}m` : "disabled"}`);
-  console.log(`  Web UI: ${webEnabled ? `http://${settings.web.host}:${webPort}` : "disabled"}`);
-  if (debugFlag) console.log("  Debug: enabled");
-  console.log(`  Jobs loaded: ${jobs.length}`);
+    console.log(`    - заблокировано: ${settings.security.disallowedTools.join(", ")}`);
+  console.log(`  Heartbeat: ${settings.heartbeat.enabled ? `каждые ${settings.heartbeat.interval} мин.` : "выключен"}`);
+  if (debugFlag) console.log("  Отладка: включена");
+  console.log(`  Загружено задач: ${jobs.length}`);
   jobs.forEach((j) => console.log(`    - ${j.name} [${j.schedule}]`));
 
   // --- Mutable state ---
@@ -359,127 +318,16 @@ export async function start(args: string[] = []) {
       startPolling(debugFlag);
       telegramSend = (chatId, text) => sendMessage(token, chatId, text);
       telegramToken = token;
-      console.log(`[${ts()}] Telegram: enabled`);
+      console.log(`[${ts()}] Telegram: включен`);
     } else if (!token && telegramToken) {
       telegramSend = null;
       telegramToken = "";
-      console.log(`[${ts()}] Telegram: disabled`);
+      console.log(`[${ts()}] Telegram: выключен`);
     }
   }
 
   await initTelegram(currentSettings.telegram.token);
-  if (!telegramToken) console.log("  Telegram: not configured");
-
-  // --- Discord ---
-  let discordSendToUser: ((userId: string, text: string) => Promise<void>) | null = null;
-  let discordToken = "";
-
-  async function initDiscord(token: string) {
-    if (token && token !== discordToken) {
-      const { startGateway, sendMessageToUser, stopGateway } = await import("./discord");
-      if (discordToken) stopGateway();
-      startGateway(debugFlag);
-      discordStopGateway = stopGateway;
-      discordSendToUser = (userId, text) => sendMessageToUser(token, userId, text);
-      discordToken = token;
-      console.log(`[${ts()}] Discord: enabled`);
-    } else if (!token && discordToken) {
-      if (discordStopGateway) discordStopGateway();
-      discordStopGateway = null;
-      discordSendToUser = null;
-      discordToken = "";
-      console.log(`[${ts()}] Discord: disabled`);
-    }
-  }
-
-  await initDiscord(currentSettings.discord.token);
-  if (!discordToken) console.log("  Discord: not configured");
-
-  function isAddrInUse(err: unknown): boolean {
-    if (!err || typeof err !== "object") return false;
-    const code = "code" in err ? String((err as { code?: unknown }).code) : "";
-    const message = "message" in err ? String((err as { message?: unknown }).message) : "";
-    return code === "EADDRINUSE" || message.includes("EADDRINUSE");
-  }
-
-  function startWebWithFallback(host: string, preferredPort: number): WebServerHandle {
-    const maxAttempts = 10;
-    let lastError: unknown;
-    for (let i = 0; i < maxAttempts; i++) {
-      const candidatePort = preferredPort + i;
-      try {
-        return startWebUi({
-          host,
-          port: candidatePort,
-          getSnapshot: () => ({
-            pid: process.pid,
-            startedAt: daemonStartedAt,
-            heartbeatNextAt: nextHeartbeatAt,
-            settings: currentSettings,
-            jobs: currentJobs,
-          }),
-          onHeartbeatEnabledChanged: (enabled) => {
-            if (currentSettings.heartbeat.enabled === enabled) return;
-            currentSettings.heartbeat.enabled = enabled;
-            scheduleHeartbeat();
-            updateState();
-            console.log(`[${ts()}] Heartbeat ${enabled ? "enabled" : "disabled"} from Web UI`);
-          },
-          onHeartbeatSettingsChanged: (patch) => {
-            let changed = false;
-            if (typeof patch.enabled === "boolean" && currentSettings.heartbeat.enabled !== patch.enabled) {
-              currentSettings.heartbeat.enabled = patch.enabled;
-              changed = true;
-            }
-            if (typeof patch.interval === "number" && Number.isFinite(patch.interval)) {
-              const interval = Math.max(1, Math.min(1440, Math.round(patch.interval)));
-              if (currentSettings.heartbeat.interval !== interval) {
-                currentSettings.heartbeat.interval = interval;
-                changed = true;
-              }
-            }
-          if (typeof patch.prompt === "string" && currentSettings.heartbeat.prompt !== patch.prompt) {
-            currentSettings.heartbeat.prompt = patch.prompt;
-            changed = true;
-          }
-          if (Array.isArray(patch.excludeWindows)) {
-            const prev = JSON.stringify(currentSettings.heartbeat.excludeWindows);
-            const next = JSON.stringify(patch.excludeWindows);
-            if (prev !== next) {
-              currentSettings.heartbeat.excludeWindows = patch.excludeWindows;
-              changed = true;
-            }
-          }
-          if (!changed) return;
-          scheduleHeartbeat();
-          updateState();
-            console.log(`[${ts()}] Heartbeat settings updated from Web UI`);
-          },
-          onJobsChanged: async () => {
-            currentJobs = await loadJobs();
-            scheduleHeartbeat();
-            updateState();
-            console.log(`[${ts()}] Jobs reloaded from Web UI`);
-          },
-          onChat: async (message, onChunk, onUnblock) => {
-            await streamUserMessage("chat", message, onChunk, onUnblock);
-          },
-        });
-      } catch (err) {
-        lastError = err;
-        if (!isAddrInUse(err) || i === maxAttempts - 1) throw err;
-      }
-    }
-
-    throw lastError;
-  }
-
-  if (webEnabled) {
-    currentSettings.web.enabled = true;
-    web = startWebWithFallback(currentSettings.web.host, webPort);
-    currentSettings.web.port = web.port;
-    console.log(`[${new Date().toLocaleTimeString()}] Web UI listening on http://${web.host}:${web.port}`);
-  }
+  if (!telegramToken) console.log("  Telegram: не настроен");
 
   // --- Helpers ---
   function ts() { return new Date().toLocaleTimeString(); }
@@ -492,32 +340,20 @@ export async function start(args: string[] = []) {
         stderr: "inherit",
       });
       proc.unref();
-      console.log(`[${ts()}] Plugin preflight started in background`);
+      console.log(`[${ts()}] Предпроверка плагина запущена в фоне`);
     } catch (err) {
-      console.error(`[${ts()}] Failed to start plugin preflight:`, err);
+      console.error(`[${ts()}] Не удалось запустить предпроверку плагина:`, err);
     }
   }
 
   function forwardToTelegram(label: string, result: { exitCode: number; stdout: string; stderr: string }) {
     if (!telegramSend || currentSettings.telegram.allowedUserIds.length === 0) return;
     const text = result.exitCode === 0
-      ? `${label ? `[${label}]\n` : ""}${result.stdout || "(empty)"}`
-      : `${label ? `[${label}] ` : ""}error (exit ${result.exitCode}): ${result.stderr || "Unknown"}`;
+      ? `${label ? `[${label}]\n` : ""}${result.stdout || "(пусто)"}`
+      : `${label ? `[${label}] ` : ""}ошибка (код ${result.exitCode}): ${result.stderr || "Неизвестно"}`;
     for (const userId of currentSettings.telegram.allowedUserIds) {
       telegramSend(userId, text).catch((err) =>
-        console.error(`[Telegram] Failed to forward to ${userId}: ${err}`)
-      );
-    }
-  }
-
-  function forwardToDiscord(label: string, result: { exitCode: number; stdout: string; stderr: string }) {
-    if (!discordSendToUser || currentSettings.discord.allowedUserIds.length === 0) return;
-    const text = result.exitCode === 0
-      ? `${label ? `[${label}]\n` : ""}${result.stdout || "(empty)"}`
-      : `${label ? `[${label}] ` : ""}error (exit ${result.exitCode}): ${result.stderr || "Unknown"}`;
-    for (const userId of currentSettings.discord.allowedUserIds) {
-      discordSendToUser(userId, text).catch((err) =>
-        console.error(`[Discord] Failed to forward to ${userId}: ${err}`)
+        console.error(`[Telegram] Не удалось переслать сообщение пользователю ${userId}: ${err}`)
       );
     }
   }
@@ -542,7 +378,7 @@ export async function start(args: string[] = []) {
 
     function tick() {
       if (isHeartbeatExcludedNow(currentSettings.heartbeat, currentSettings.timezoneOffsetMinutes)) {
-        console.log(`[${ts()}] Heartbeat skipped (excluded window)`);
+        console.log(`[${ts()}] Heartbeat пропущен из-за тихого окна`);
         nextHeartbeatAt = nextAllowedHeartbeatAt(
           currentSettings.heartbeat,
           currentSettings.timezoneOffsetMinutes,
@@ -570,7 +406,6 @@ export async function start(args: string[] = []) {
           const shouldForward = currentSettings.heartbeat.forwardToTelegram || !r.stdout.trim().startsWith("HEARTBEAT_OK");
           if (shouldForward) {
             forwardToTelegram("", r);
-            forwardToDiscord("", r);
           }
         });
       nextHeartbeatAt = nextAllowedHeartbeatAt(
@@ -591,13 +426,12 @@ export async function start(args: string[] = []) {
   // - trigger mode: run exactly one trigger prompt (no separate bootstrap)
   // - normal mode: bootstrap to initialize session context
   if (hasTriggerFlag) {
-    const triggerPrompt = hasPromptFlag ? payload : "Wake up, my friend!";
+    const triggerPrompt = hasPromptFlag ? payload : "Проснись, мой друг!";
     const triggerResult = await run("trigger", triggerPrompt);
     console.log(triggerResult.stdout);
     if (telegramFlag) forwardToTelegram("", triggerResult);
-    if (discordFlag) forwardToDiscord("", triggerResult);
     if (triggerResult.exitCode !== 0) {
-      console.error(`[${ts()}] Startup trigger failed (exit ${triggerResult.exitCode}). Daemon will continue running.`);
+      console.error(`[${ts()}] Стартовый триггер завершился с ошибкой (код ${triggerResult.exitCode}). Демон продолжит работу.`);
     }
   } else {
     // Bootstrap the session first so system prompt is initial context
@@ -632,37 +466,28 @@ export async function start(args: string[] = []) {
         newSettings.security.disallowedTools.join(",") !== currentSettings.security.disallowedTools.join(",");
 
       if (secChanged) {
-        console.log(`[${ts()}] Security level changed → ${newSettings.security.level}`);
+        console.log(`[${ts()}] Уровень безопасности изменён → ${newSettings.security.level}`);
       }
 
       if (hbChanged) {
-        console.log(`[${ts()}] Config change detected — heartbeat: ${newSettings.heartbeat.enabled ? `every ${newSettings.heartbeat.interval}m` : "disabled"}`);
+        console.log(`[${ts()}] Обнаружено изменение конфигурации — heartbeat: ${newSettings.heartbeat.enabled ? `каждые ${newSettings.heartbeat.interval} мин.` : "выключен"}`);
         currentSettings = newSettings;
         scheduleHeartbeat();
       } else {
         currentSettings = newSettings;
       }
-      if (web) {
-        currentSettings.web.enabled = true;
-        currentSettings.web.port = web.port;
-      }
-
       // Detect job changes
       const jobNames = newJobs.map((j) => `${j.name}:${j.schedule}:${j.prompt}`).sort().join("|");
       const oldJobNames = currentJobs.map((j) => `${j.name}:${j.schedule}:${j.prompt}`).sort().join("|");
       if (jobNames !== oldJobNames) {
-        console.log(`[${ts()}] Jobs reloaded: ${newJobs.length} job(s)`);
+        console.log(`[${ts()}] Задачи перезагружены: ${newJobs.length}`);
         newJobs.forEach((j) => console.log(`    - ${j.name} [${j.schedule}]`));
       }
       currentJobs = newJobs;
 
-      // Telegram changes
       await initTelegram(newSettings.telegram.token);
-
-      // Discord changes
-      await initDiscord(newSettings.discord.token);
     } catch (err) {
-      console.error(`[${ts()}] Hot-reload error:`, err);
+      console.error(`[${ts()}] Ошибка горячей перезагрузки:`, err);
     }
   }, 30_000);
 
@@ -679,13 +504,7 @@ export async function start(args: string[] = []) {
       })),
       security: currentSettings.security.level,
       telegram: !!currentSettings.telegram.token,
-      discord: !!currentSettings.discord.token,
       startedAt: daemonStartedAt,
-      web: {
-        enabled: !!web,
-        host: currentSettings.web.host,
-        port: currentSettings.web.port,
-      },
     };
     writeState(state);
   }
@@ -702,15 +521,14 @@ export async function start(args: string[] = []) {
             if (job.notify === false) return;
             if (job.notify === "error" && r.exitCode === 0) return;
             forwardToTelegram(job.name, r);
-            forwardToDiscord(job.name, r);
           })
           .finally(async () => {
             if (job.recurring) return;
             try {
               await clearJobSchedule(job.name);
-              console.log(`[${ts()}] Cleared schedule for one-time job: ${job.name}`);
+              console.log(`[${ts()}] Расписание одноразовой задачи очищено: ${job.name}`);
             } catch (err) {
-              console.error(`[${ts()}] Failed to clear schedule for ${job.name}:`, err);
+              console.error(`[${ts()}] Не удалось очистить расписание для ${job.name}:`, err);
             }
           });
       }

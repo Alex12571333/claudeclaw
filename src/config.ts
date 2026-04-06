@@ -9,44 +9,6 @@ const JOBS_DIR = join(HEARTBEAT_DIR, "jobs");
 const LOGS_DIR = join(HEARTBEAT_DIR, "logs");
 
 const DEFAULT_SETTINGS: Settings = {
-  model: "",
-  api: "",
-  fallback: {
-    model: "",
-    api: "",
-  },
-  agentic: {
-    enabled: false,
-    defaultMode: "implementation",
-    modes: [
-      {
-        name: "planning",
-        model: "opus",
-        keywords: [
-          "plan", "design", "architect", "strategy", "approach",
-          "research", "investigate", "analyze", "explore", "understand",
-          "think", "consider", "evaluate", "assess", "review",
-          "system design", "trade-off", "decision", "choose", "compare",
-          "brainstorm", "ideate", "concept", "proposal",
-        ],
-        phrases: [
-          "how to implement", "how should i", "what's the best way to",
-          "should i", "which approach", "help me decide", "help me understand",
-        ],
-      },
-      {
-        name: "implementation",
-        model: "sonnet",
-        keywords: [
-          "implement", "code", "write", "create", "build", "add",
-          "fix", "debug", "refactor", "update", "modify", "change",
-          "deploy", "run", "execute", "install", "configure",
-          "test", "commit", "push", "merge", "release",
-          "generate", "scaffold", "setup", "initialize",
-        ],
-      },
-    ],
-  },
   timezone: "UTC",
   timezoneOffsetMinutes: 0,
   heartbeat: {
@@ -57,9 +19,7 @@ const DEFAULT_SETTINGS: Settings = {
     forwardToTelegram: true,
   },
   telegram: { token: "", allowedUserIds: [] },
-  discord: { token: "", allowedUserIds: [], listenChannels: [] },
   security: { level: "moderate", allowedTools: [], disallowedTools: [] },
-  web: { enabled: false, host: "127.0.0.1", port: 4632 },
   stt: { baseUrl: "", model: "" },
 };
 
@@ -82,12 +42,6 @@ export interface TelegramConfig {
   allowedUserIds: number[];
 }
 
-export interface DiscordConfig {
-  token: string;
-  allowedUserIds: string[]; // Discord snowflake IDs exceed Number.MAX_SAFE_INTEGER
-  listenChannels: string[]; // Channel IDs where bot responds to all messages (no mention needed)
-}
-
 export type SecurityLevel =
   | "locked"
   | "strict"
@@ -101,42 +55,12 @@ export interface SecurityConfig {
 }
 
 export interface Settings {
-  model: string;
-  api: string;
-  fallback: ModelConfig;
-  agentic: AgenticConfig;
   timezone: string;
   timezoneOffsetMinutes: number;
   heartbeat: HeartbeatConfig;
   telegram: TelegramConfig;
-  discord: DiscordConfig;
   security: SecurityConfig;
-  web: WebConfig;
   stt: SttConfig;
-}
-
-export interface AgenticMode {
-  name: string;
-  model: string;
-  keywords: string[];
-  phrases?: string[];
-}
-
-export interface AgenticConfig {
-  enabled: boolean;
-  defaultMode: string;
-  modes: AgenticMode[];
-}
-
-export interface ModelConfig {
-  model: string;
-  api: string;
-}
-
-export interface WebConfig {
-  enabled: boolean;
-  host: string;
-  port: number;
 }
 
 export interface SttConfig {
@@ -167,56 +91,6 @@ const VALID_LEVELS = new Set<SecurityLevel>([
   "unrestricted",
 ]);
 
-function parseAgenticMode(raw: any): AgenticMode | null {
-  if (!raw || typeof raw !== "object") return null;
-  const name = typeof raw.name === "string" ? raw.name.trim() : "";
-  const model = typeof raw.model === "string" ? raw.model.trim() : "";
-  if (!name || !model) return null;
-  const keywords = Array.isArray(raw.keywords)
-    ? raw.keywords.filter((k: unknown) => typeof k === "string").map((k: string) => k.toLowerCase().trim())
-    : [];
-  const phrases = Array.isArray(raw.phrases)
-    ? raw.phrases.filter((p: unknown) => typeof p === "string").map((p: string) => p.toLowerCase().trim())
-    : undefined;
-  return { name, model, keywords, ...(phrases && phrases.length > 0 ? { phrases } : {}) };
-}
-
-function parseAgenticConfig(raw: any): AgenticConfig {
-  const defaults = DEFAULT_SETTINGS.agentic;
-  if (!raw || typeof raw !== "object") return defaults;
-
-  const enabled = raw.enabled ?? false;
-
-  // Backward compat: old planningModel/implementationModel format
-  if (!Array.isArray(raw.modes) && ("planningModel" in raw || "implementationModel" in raw)) {
-    const planningModel = typeof raw.planningModel === "string" ? raw.planningModel.trim() : "opus";
-    const implModel = typeof raw.implementationModel === "string" ? raw.implementationModel.trim() : "sonnet";
-    return {
-      enabled,
-      defaultMode: "implementation",
-      modes: [
-        { ...defaults.modes[0], model: planningModel },
-        { ...defaults.modes[1], model: implModel },
-      ],
-    };
-  }
-
-  // New modes format
-  const modes: AgenticMode[] = [];
-  if (Array.isArray(raw.modes)) {
-    for (const m of raw.modes) {
-      const parsed = parseAgenticMode(m);
-      if (parsed) modes.push(parsed);
-    }
-  }
-
-  return {
-    enabled,
-    defaultMode: typeof raw.defaultMode === "string" ? raw.defaultMode.trim() : "implementation",
-    modes: modes.length > 0 ? modes : defaults.modes,
-  };
-}
-
 function parseSettings(raw: Record<string, any>): Settings {
   const rawLevel = raw.security?.level;
   const level: SecurityLevel =
@@ -227,13 +101,6 @@ function parseSettings(raw: Record<string, any>): Settings {
   const parsedTimezone = parseTimezone(raw.timezone);
 
   return {
-    model: typeof raw.model === "string" ? raw.model.trim() : "",
-    api: typeof raw.api === "string" ? raw.api.trim() : "",
-    fallback: {
-      model: typeof raw.fallback?.model === "string" ? raw.fallback.model.trim() : "",
-      api: typeof raw.fallback?.api === "string" ? raw.fallback.api.trim() : "",
-    },
-    agentic: parseAgenticConfig(raw.agentic),
     timezone: parsedTimezone,
     timezoneOffsetMinutes: parseTimezoneOffsetMinutes(raw.timezoneOffsetMinutes, parsedTimezone),
     heartbeat: {
@@ -247,15 +114,6 @@ function parseSettings(raw: Record<string, any>): Settings {
       token: raw.telegram?.token ?? "",
       allowedUserIds: raw.telegram?.allowedUserIds ?? [],
     },
-    discord: {
-      token: typeof raw.discord?.token === "string" ? raw.discord.token.trim() : "",
-      allowedUserIds: Array.isArray(raw.discord?.allowedUserIds)
-          ? raw.discord.allowedUserIds.map(String)
-          : [],
-      listenChannels: Array.isArray(raw.discord?.listenChannels)
-        ? raw.discord.listenChannels.map(String)
-        : [],
-    },
     security: {
       level,
       allowedTools: Array.isArray(raw.security?.allowedTools)
@@ -264,11 +122,6 @@ function parseSettings(raw: Record<string, any>): Settings {
       disallowedTools: Array.isArray(raw.security?.disallowedTools)
         ? raw.security.disallowedTools
         : [],
-    },
-    web: {
-      enabled: raw.web?.enabled ?? false,
-      host: raw.web?.host ?? "127.0.0.1",
-      port: Number.isFinite(raw.web?.port) ? Number(raw.web.port) : 4632,
     },
     stt: {
       baseUrl: typeof raw.stt?.baseUrl === "string" ? raw.stt.baseUrl.trim() : "",
@@ -312,30 +165,11 @@ function parseTimezoneOffsetMinutes(value: unknown, timezoneFallback?: string): 
   return resolveTimezoneOffsetMinutes(value, timezoneFallback);
 }
 
-/**
- * Extract discord.allowedUserIds as raw strings from the JSON text.
- * JSON.parse destroys precision on large numeric snowflakes (>2^53),
- * so we regex them out of the raw text first.
- */
-function extractDiscordUserIds(rawText: string): string[] {
-  // Match the "discord" object's "allowedUserIds" array values
-  const discordBlock = rawText.match(/"discord"\s*:\s*\{[\s\S]*?\}/);
-  if (!discordBlock) return [];
-  const arrayMatch = discordBlock[0].match(/"allowedUserIds"\s*:\s*\[([\s\S]*?)\]/);
-  if (!arrayMatch) return [];
-  const items: string[] = [];
-  // Match both quoted strings and bare numbers
-  for (const m of arrayMatch[1].matchAll(/("(\d+)"|(\d+))/g)) {
-    items.push(m[2] ?? m[3]);
-  }
-  return items;
-}
-
 export async function loadSettings(): Promise<Settings> {
   if (cached) return cached;
   const rawText = await Bun.file(SETTINGS_FILE).text();
   const raw = JSON.parse(rawText);
-  cached = parseSettings(raw, extractDiscordUserIds(rawText));
+  cached = parseSettings(raw);
   return cached;
 }
 
@@ -343,7 +177,7 @@ export async function loadSettings(): Promise<Settings> {
 export async function reloadSettings(): Promise<Settings> {
   const rawText = await Bun.file(SETTINGS_FILE).text();
   const raw = JSON.parse(rawText);
-  cached = parseSettings(raw, extractDiscordUserIds(rawText));
+  cached = parseSettings(raw);
   return cached;
 }
 

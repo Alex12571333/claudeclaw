@@ -6,18 +6,18 @@ export async function clear() {
   const backup = await backupSession();
 
   if (backup) {
-    console.log(`Session backed up → ${backup}`);
+    console.log(`Резервная копия сессии создана → ${backup}`);
   } else {
-    console.log("No active session to back up.");
+    console.log("Нет активной сессии для резервного копирования.");
   }
 
   // If daemon is running, stop it so the next start gets a fresh session
   const pid = await checkExistingDaemon();
   if (pid) {
-    console.log("Stopping daemon so next start creates a fresh session...");
+    console.log("Останавливаю демон, чтобы при следующем запуске создалась новая сессия...");
     await stop();
   } else {
-    console.log("No daemon running. Next start will create a new session.");
+    console.log("Демон не запущен. Следующий старт создаст новую сессию.");
     process.exit(0);
   }
 }

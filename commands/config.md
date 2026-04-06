@@ -1,5 +1,5 @@
 ---
-description: View or modify heartbeat settings
+description: Просмотр и изменение настроек heartbeat
 ---
 
 View or modify the heartbeat daemon settings. Use `$ARGUMENTS` to determine the action.
@@ -14,10 +14,7 @@ Parse `$ARGUMENTS` to identify what the user wants. If no arguments are given, s
 2. Display all settings clearly:
 
    **General**
-   - Model: (e.g. `opus`, `sonnet`, `haiku`, `glm` or "default")
-   - API token: (first 5 chars + "..." or "not configured"; used when `model` is `glm`)
-   - Fallback model: (e.g. `glm`, `sonnet`, or "not configured")
-   - Fallback API token: (first 5 chars + "..." or "not configured")
+   - Model: inherited from Claude Code
    - Timezone: (e.g. `America/New_York` or "UTC")
 
    **Heartbeat**
@@ -35,10 +32,6 @@ Parse `$ARGUMENTS` to identify what the user wants. If no arguments are given, s
    - Level: (locked/strict/moderate/unrestricted)
    - Allowed tools: (list or "default")
    - Disallowed tools: (list or "none")
-
-   **Web UI**
-   - Enabled: yes/no
-   - Address: host:port
 
 3. Also list any cron jobs from `.claude/claudeclaw/jobs/` with their name and schedule.
 4. Remind the user that changes are hot-reloaded every 30s — no daemon restart needed.
@@ -112,48 +105,6 @@ Disable Telegram integration.
 2. Set `telegram.token` to `""` and `telegram.allowedUserIds` to `[]`.
 3. Write and confirm.
 
-### `model <name>` / `model`
-
-Set the Claude model to use for sessions.
-
-1. If model name is in `$ARGUMENTS`, use it directly.
-2. Otherwise, use **AskUserQuestion**: "Which Claude model should ClaudeClaw use?" (header: "Model", options: "opus (default)", "sonnet", "haiku", "glm")
-3. Read `.claude/claudeclaw/settings.json`.
-4. Set `model` to the new value.
-5. If the selected model is `glm`, ask for `api` token (unless already set) and save it to top-level `api`.
-6. If model is changed away from `glm`, keep `api` unchanged.
-7. Write and confirm.
-
-### `api <token>` / `api`
-
-Set or update the API token used when `model` is `glm`.
-
-1. If token is in `$ARGUMENTS`, use it directly.
-2. Otherwise, use **AskUserQuestion**: "What API token should ClaudeClaw use for glm?" (header: "API token", options: let user type via Other)
-3. Read `.claude/claudeclaw/settings.json`.
-4. Set top-level `api` to the new value.
-5. Write and confirm.
-
-### `fallback model <name>` / `fallback model`
-
-Set the fallback model used when the primary model hits a rate limit.
-
-1. If fallback model name is in `$ARGUMENTS`, use it directly.
-2. Otherwise, use **AskUserQuestion**: "Which fallback model should ClaudeClaw use?" (header: "Fallback model", options: "glm (Recommended)", "sonnet", "haiku")
-3. Read `.claude/claudeclaw/settings.json`.
-4. Set `fallback.model` to the chosen value (`""` for none).
-5. Write and confirm.
-
-### `fallback api <token>` / `fallback api`
-
-Set or clear the API token for the fallback model.
-
-1. If token is in `$ARGUMENTS`, use it directly.
-2. Otherwise, use **AskUserQuestion**: "What API token should ClaudeClaw use for fallback model?" (header: "Fallback API token", options: let user type via Other)
-3. Read `.claude/claudeclaw/settings.json`.
-4. Set `fallback.api` to the new value.
-5. Write and confirm.
-
 ### `timezone <tz>` / `timezone`
 
 Set the IANA timezone (e.g. `America/New_York`, `Europe/London`, `UTC`).
@@ -183,23 +134,6 @@ Add tools to the allowed or disallowed lists.
 3. Append to `security.allowedTools` or `security.disallowedTools` (deduplicated).
 4. Write and confirm.
 
-### `web on` / `web off` / `web enable` / `web disable`
-
-Toggle the web UI.
-
-1. Read `.claude/claudeclaw/settings.json`.
-2. Set `web.enabled` to `true` or `false`.
-3. Write and confirm.
-
-### `web port <port>` / `web host <host>`
-
-Configure web UI bind address or port.
-
-1. Parse the value from `$ARGUMENTS`.
-2. Read `.claude/claudeclaw/settings.json`.
-3. Set `web.port` (number) or `web.host` (string) accordingly.
-4. Write and confirm.
-
 ### `reset`
 
 Reset all settings to defaults.
@@ -208,12 +142,6 @@ Reset all settings to defaults.
 2. If confirmed, write the default settings:
    ```json
    {
-     "model": "",
-     "api": "",
-     "fallback": {
-       "model": "",
-       "api": ""
-     },
      "timezone": "UTC",
      "timezoneOffsetMinutes": 0,
      "heartbeat": {
@@ -231,11 +159,6 @@ Reset all settings to defaults.
        "level": "moderate",
        "allowedTools": [],
        "disallowedTools": []
-     },
-     "web": {
-       "enabled": false,
-       "host": "127.0.0.1",
-       "port": 4632
      }
    }
    ```
@@ -249,12 +172,6 @@ Location: `.claude/claudeclaw/settings.json`
 
 ```json
 {
-  "model": "opus",
-  "api": "",
-  "fallback": {
-    "model": "glm",
-    "api": ""
-  },
   "timezone": "America/New_York",
   "timezoneOffsetMinutes": -300,
   "heartbeat": {
@@ -274,21 +191,12 @@ Location: `.claude/claudeclaw/settings.json`
     "level": "moderate",
     "allowedTools": [],
     "disallowedTools": []
-  },
-  "web": {
-    "enabled": true,
-    "host": "127.0.0.1",
-    "port": 4632
   }
 }
 ```
 
 | Key                        | Type       | Description                                    |
 |----------------------------|------------|------------------------------------------------|
-| `model`                    | string     | Claude model (`opus`, `sonnet`, `haiku`, `glm`, or full ID). Empty = default |
-| `api`                      | string     | API token used when model is `glm` (mapped to `ANTHROPIC_AUTH_TOKEN`) |
-| `fallback.model`           | string     | Backup model used automatically if primary run returns rate-limit text (recommend `glm` for provider diversity) |
-| `fallback.api`             | string     | API token used with `fallback.model` (optional) |
 | `timezone`                 | string     | IANA timezone name (e.g. `America/New_York`)   |
 | `timezoneOffsetMinutes`    | number     | UTC offset in minutes (auto-resolved from timezone) |
 | `heartbeat.enabled`        | boolean    | Whether the recurring heartbeat runs           |
@@ -304,8 +212,5 @@ Location: `.claude/claudeclaw/settings.json`
 | `security.level`           | string     | `locked` \| `strict` \| `moderate` \| `unrestricted` |
 | `security.allowedTools`    | string[]   | Extra tools to allow                           |
 | `security.disallowedTools` | string[]   | Tools to block                                 |
-| `web.enabled`              | boolean    | Whether the web UI is served                   |
-| `web.host`                 | string     | Bind address (default `127.0.0.1`)             |
-| `web.port`                 | number     | Port number (default `4632`)                   |
 
 The daemon hot-reloads this file every 30 seconds. No restart needed after changes.

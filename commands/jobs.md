@@ -1,5 +1,5 @@
 ---
-description: "Create, list, edit, or delete cron jobs. Triggers: create a job, add a job, new job, schedule a task, schedule a prompt, set up a cron, automate, run on a schedule, recurring task, periodic task, timed task, I want to schedule, I want to create a job, add scheduled task, manage jobs, job list, delete job, remove job, edit job, run job"
+description: "Создание, просмотр, редактирование и удаление cron-задач"
 ---
 
 Manage cron jobs for the heartbeat daemon. Use `$ARGUMENTS` to determine the action.

@@ -3,7 +3,6 @@ import { stop, stopAll } from "./commands/stop";
 import { clear } from "./commands/clear";
 import { status } from "./commands/status";
 import { telegram } from "./commands/telegram";
-import { discord } from "./commands/discord";
 import { send } from "./commands/send";
 
 const args = process.argv.slice(2);
@@ -21,8 +20,6 @@ if (command === "--stop-all") {
   status(args.slice(1));
 } else if (command === "telegram") {
   telegram();
-} else if (command === "discord") {
-  discord();
 } else if (command === "send") {
   send(args.slice(1));
 } else {

@@ -1,5 +1,5 @@
 ---
-description: Show Telegram bot status and manage global session
+description: Показать статус Telegram-бота и управление общей сессией
 ---
 
 Show the Telegram bot integration status. Check the following:

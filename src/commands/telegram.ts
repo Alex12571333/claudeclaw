@@ -1,4 +1,4 @@
-import { ensureProjectClaudeMd, run, runUserMessage, compactCurrentSession } from "../runner";
+import { ensureProjectClaudeMd, run, runUserMessage } from "../runner";
 import { getSettings, loadSettings } from "../config";
 import { resetSession, peekSession } from "../sessions";
 import { readFile } from "node:fs/promises";
@@ -612,22 +612,15 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
     await sendMessage(
       config.token,
       chatId,
-      "Hello! Send me a message and I'll respond using Claude.\nUse /reset to start a fresh session.",
+      "Привет! Напишите мне сообщение, и я отвечу через Claude.\nИспользуйте /new, чтобы начать новую сессию.",
       threadId
     );
     return;
   }
 
-  if (command === "/reset") {
+  if (command === "/new" || command === "/reset") {
     await resetSession();
-    await sendMessage(config.token, chatId, "Global session reset. Next message starts fresh.", threadId);
-    return;
-  }
-
-  if (command === "/compact") {
-    await sendMessage(config.token, chatId, "⏳ Compacting session...", threadId);
-    const result = await compactCurrentSession();
-    await sendMessage(config.token, chatId, result.message, threadId);
+    await sendMessage(config.token, chatId, "Глобальная сессия сброшена. Следующее сообщение начнёт новую сессию.", threadId);
     return;
   }
 
@@ -635,18 +628,18 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
     const session = await peekSession();
     const settings = getSettings();
     if (!session) {
-      await sendMessage(config.token, chatId, "📊 No active session.", threadId);
+      await sendMessage(config.token, chatId, "📊 Нет активной сессии.", threadId);
       return;
     }
     const lines = [
-      "📊 **Session Status**",
-      `Session: \`${session.sessionId.slice(0, 8)}\``,
-      `Turns: ${session.turnCount ?? 0}`,
-      `Model: ${settings.model || "default"}`,
-      `Security: ${settings.security.level}`,
-      `Created: ${session.createdAt}`,
-      `Last used: ${session.lastUsedAt}`,
-      `Compact warned: ${(session as any).compactWarned ? "yes" : "no"}`,
+      "📊 **Статус сессии**",
+      `Сессия: \`${session.sessionId.slice(0, 8)}\``,
+      `Ходов: ${session.turnCount ?? 0}`,
+      `Модель: из настроек Claude Code`,
+      `Безопасность: ${settings.security.level}`,
+      `Создана: ${session.createdAt}`,
+      `Последняя активность: ${session.lastUsedAt}`,
+      `Предупреждение о compact: ${(session as any).compactWarned ? "да" : "нет"}`,
     ];
     await sendMessage(config.token, chatId, lines.join("\n"), threadId);
     return;
@@ -655,14 +648,14 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
   if (command === "/context") {
     const session = await peekSession();
     if (!session) {
-      await sendMessage(config.token, chatId, "No active session.", threadId);
+      await sendMessage(config.token, chatId, "Нет активной сессии.", threadId);
       return;
     }
     const home = homedir();
     const projectSlug = process.cwd().replace(/\//g, "-");
     const jsonlPath = `${home}/.claude/projects/${projectSlug}/${session.sessionId}.jsonl`;
     if (!existsSync(jsonlPath)) {
-      await sendMessage(config.token, chatId, "Conversation file not found.", threadId);
+      await sendMessage(config.token, chatId, "Файл диалога не найден.", threadId);
       return;
     }
     try {
@@ -678,7 +671,7 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
         } catch {}
       }
       if (!lastUsage) {
-        await sendMessage(config.token, chatId, "No usage data found.", threadId);
+        await sendMessage(config.token, chatId, "Данные об использовании не найдены.", threadId);
         return;
       }
       const input = lastUsage.input_tokens ?? 0;
@@ -689,20 +682,20 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
       const pct = ((totalContext / maxContext) * 100).toFixed(1);
       const bar = buildProgressBar(totalContext, maxContext);
       const msg = [
-        `📐 **Context Window**`,
+        `📐 **Контекстное окно**`,
         `${bar} ${pct}%`,
         ``,
-        `Total: \`${totalContext.toLocaleString()}\` / \`${maxContext.toLocaleString()}\` tokens`,
-        `├ Input: \`${input.toLocaleString()}\``,
-        `├ Cache creation: \`${cacheCreation.toLocaleString()}\``,
-        `├ Cache read: \`${cacheRead.toLocaleString()}\``,
-        `└ Output (cumulative): \`${totalOutput.toLocaleString()}\``,
+        `Всего: \`${totalContext.toLocaleString()}\` / \`${maxContext.toLocaleString()}\` токенов`,
+        `├ Ввод: \`${input.toLocaleString()}\``,
+        `├ Создание кэша: \`${cacheCreation.toLocaleString()}\``,
+        `├ Чтение кэша: \`${cacheRead.toLocaleString()}\``,
+        `└ Вывод (накопительно): \`${totalOutput.toLocaleString()}\``,
         ``,
-        `Turns: ${session.turnCount ?? 0}`,
+        `Ходов: ${session.turnCount ?? 0}`,
       ];
       await sendMessage(config.token, chatId, msg.join("\n"), threadId);
     } catch (err) {
-      await sendMessage(config.token, chatId, `Failed to read context: ${err instanceof Error ? err.message : err}`, threadId);
+      await sendMessage(config.token, chatId, `Не удалось прочитать контекст: ${err instanceof Error ? err.message : err}`, threadId);
     }
     return;
   }
@@ -720,7 +713,7 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text }),
           });
-          await sendMessage(config.token, chatId, `✅ Sent custom reply + pattern learned.`, threadId);
+          await sendMessage(config.token, chatId, `✅ Пользовательский ответ отправлен, шаблон сохранён.`, threadId);
           return;
         }
       }
@@ -773,7 +766,7 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
 
     // Skill routing: resolve slash commands to SKILL.md prompts
     let skillContext: string | null = null;
-    if (command && command !== "/start" && command !== "/reset" && command !== "/compact" && command !== "/status" && command !== "/context") {
+    if (command && command !== "/start" && command !== "/new" && command !== "/reset" && command !== "/status" && command !== "/context") {
       try {
         skillContext = await resolveSkillPrompt(command);
         if (skillContext) {
@@ -808,34 +801,34 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
     }
     if (imagePath) {
       promptParts.push(`Image path: ${imagePath}`);
-      promptParts.push("The user attached an image. Inspect this image file directly before answering.");
+      promptParts.push("Пользователь приложил изображение. Перед ответом открой и изучи этот файл напрямую.");
     } else if (hasImage) {
-      promptParts.push("The user attached an image, but downloading it failed. Respond and ask them to resend.");
+      promptParts.push("Пользователь приложил изображение, но скачать его не удалось. Ответь и попроси отправить файл ещё раз.");
     }
     if (voiceTranscript) {
       promptParts.push(`Voice transcript: ${voiceTranscript}`);
-      promptParts.push("The user attached voice audio. Use the transcript as their spoken message.");
+      promptParts.push("Пользователь прислал голосовое сообщение. Используй расшифровку как его речь.");
     } else if (hasVoice) {
       promptParts.push(
-        "The user attached voice audio, but it could not be transcribed. Respond and ask them to resend a clearer clip."
+        "Пользователь прислал голосовое сообщение, но его не удалось расшифровать. Ответь и попроси прислать запись ещё раз, лучше качеством."
       );
     }
     if (documentInfo) {
       promptParts.push(`Document path: ${documentInfo.localPath}`);
       promptParts.push(`Original filename: ${documentInfo.originalName}`);
       promptParts.push(
-        "The user attached a document. Read and process this file directly."
+        "Пользователь приложил документ. Прочитай и обработай этот файл напрямую."
       );
     } else if (hasDocument) {
       promptParts.push(
-        "The user attached a document, but downloading it failed. Respond and ask them to resend."
+        "Пользователь приложил документ, но скачать его не удалось. Ответь и попроси прислать его ещё раз."
       );
     }
     const prefixedPrompt = promptParts.join("\n");
     const result = await runUserMessage("telegram", prefixedPrompt);
 
     if (result.exitCode !== 0) {
-      await sendMessage(config.token, chatId, `Error (exit ${result.exitCode}): ${result.stderr || "Unknown error"}`, threadId);
+      await sendMessage(config.token, chatId, `Ошибка (код ${result.exitCode}): ${result.stderr || "Неизвестная ошибка"}`, threadId);
     } else {
       const { cleanedText: afterReact, reactionEmoji } = extractReactionDirective(result.stdout || "");
       const { cleanedText, filePaths } = extractSendFileDirectives(afterReact);
@@ -852,17 +845,17 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
           await sendDocumentToChat(config.token, chatId, fp, threadId);
         } catch (err) {
           console.error(`[Telegram] Failed to send document for ${label}: ${err instanceof Error ? err.message : err}`);
-          await sendMessage(config.token, chatId, `Failed to send file: ${fp.split("/").pop()}`, threadId);
+          await sendMessage(config.token, chatId, `Не удалось отправить файл: ${fp.split("/").pop()}`, threadId);
         }
       }
       if (!cleanedText && filePaths.length === 0) {
-        await sendMessage(config.token, chatId, "(empty response)", threadId);
+        await sendMessage(config.token, chatId, "(пустой ответ)", threadId);
       }
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error(`[Telegram] Error for ${label}: ${errMsg}`);
-    await sendMessage(config.token, chatId, `Error: ${errMsg}`, threadId);
+    await sendMessage(config.token, chatId, `Ошибка: ${errMsg}`, threadId);
   } finally {
     clearInterval(typingInterval);
   }
@@ -879,13 +872,13 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
   if (secMatch) {
     const action = secMatch[1];
     const pendingId = secMatch[2];
-    let answerText = "⚠️ Server error";
+    let answerText = "⚠️ Ошибка сервера";
     try {
       const resp = await fetch(`http://127.0.0.1:9999/confirm/${pendingId}/${action}`);
       const result = await resp.json() as { ok: boolean };
-      answerText = action === "yes" && result.ok ? "✅ Đã gửi!" : result.ok ? "❌ Dismissed" : "⚠️ Not found";
+      answerText = action === "yes" && result.ok ? "✅ Отправлено!" : result.ok ? "❌ Скрыто" : "⚠️ Не найдено";
       if (query.message) {
-        const statusLine = action === "yes" ? "\n\n✅ Sent" : "\n\n❌ Dismissed";
+        const statusLine = action === "yes" ? "\n\n✅ Отправлено" : "\n\n❌ Скрыто";
         const newText = (query.message.text ?? "").replace(/\n\nReply:.*$/s, statusLine);
         await callApi(config.token, "editMessageText", {
           chat_id: query.message.chat.id,
@@ -913,11 +906,10 @@ async function registerBotCommands(token: string): Promise<void> {
   try {
     const skills = await listSkills();
     const commands = [
-      { command: "start", description: "Show welcome message" },
-      { command: "reset", description: "Reset session and start fresh" },
-      { command: "compact", description: "Compact session to reduce context size" },
-      { command: "status", description: "Show current session status" },
-      { command: "context", description: "Show context window usage" },
+      { command: "start", description: "Показать приветствие" },
+      { command: "new", description: "Сбросить сессию и начать заново" },
+      { command: "status", description: "Показать текущий статус сессии" },
+      { command: "context", description: "Показать использование контекстного окна" },
     ];
     for (const skill of skills) {
       // Telegram commands: 1-32 chars, lowercase a-z, 0-9, underscores only
@@ -926,11 +918,11 @@ async function registerBotCommands(token: string): Promise<void> {
         .replace(/[-.:]/g, "_")
         .replace(/[^a-z0-9_]/g, "")
         .slice(0, 32);
-      if (!cmd || cmd === "start" || cmd === "reset") continue;
+      if (!cmd || cmd === "start" || cmd === "new" || cmd === "reset") continue;
       if (cmd.length > 30) continue;
       const desc = skill.description.length >= 3
         ? skill.description.slice(0, 256)
-        : `Run ${skill.name} skill`;
+        : `Запустить навык ${skill.name}`;
       commands.push({ command: cmd, description: desc });
     }
     if (commands.length > 100) commands.length = 100;
@@ -940,7 +932,7 @@ async function registerBotCommands(token: string): Promise<void> {
     } catch (regErr) {
       // Skill-generated commands may violate Telegram constraints; retry with built-in commands only
       console.warn(`[Telegram] Full command registration failed, retrying with built-in commands only: ${regErr instanceof Error ? regErr.message : regErr}`);
-      const builtinOnly = commands.filter((c) => ["start", "reset", "compact", "status", "context"].includes(c.command));
+      const builtinOnly = commands.filter((c) => ["start", "new", "status", "context"].includes(c.command));
       await callApi(token, "setMyCommands", { commands: builtinOnly });
       console.log(`  Commands registered (built-in only): ${builtinOnly.length}`);
     }
@@ -962,15 +954,15 @@ async function poll(): Promise<void> {
       botUsername = me.result.username ?? null;
       botId = me.result.id;
       console.log(`  Bot: ${botUsername ? `@${botUsername}` : botId}`);
-      console.log(`  Group privacy: ${me.result.can_read_all_group_messages ? "disabled (reads all messages)" : "enabled (commands & mentions only)"}`);
+      console.log(`  Приватность в группах: ${me.result.can_read_all_group_messages ? "выключена (читает все сообщения)" : "включена (только команды и упоминания)"}`);
     }
   } catch (err) {
     console.error(`[Telegram] getMe failed: ${err instanceof Error ? err.message : err}`);
   }
 
-  console.log("Telegram bot started (long polling)");
-  console.log(`  Allowed users: ${config.allowedUserIds.length === 0 ? "all" : config.allowedUserIds.join(", ")}`);
-  if (telegramDebug) console.log("  Debug: enabled");
+  console.log("Telegram-бот запущен (long polling)");
+  console.log(`  Разрешённые пользователи: ${config.allowedUserIds.length === 0 ? "все" : config.allowedUserIds.join(", ")}`);
+  if (telegramDebug) console.log("  Отладка: включена");
 
   // Register available skills as bot command menu (non-blocking)
   registerBotCommands(config.token).catch(() => {});

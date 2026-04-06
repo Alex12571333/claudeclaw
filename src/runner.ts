@@ -8,9 +8,8 @@ import {
   incrementThreadTurn,
   markThreadCompactWarned,
 } from "./sessionManager";
-import { getSettings, type ModelConfig, type SecurityConfig } from "./config";
+import { getSettings, type SecurityConfig } from "./config";
 import { buildClockPromptPrefix } from "./timezone";
-import { selectModel } from "./model-router";
 
 const LOGS_DIR = join(process.cwd(), ".claude/claudeclaw/logs");
 // Resolve prompts relative to the claudeclaw installation, not the project dir
@@ -57,8 +56,6 @@ export interface RunResult {
   exitCode: number;
 }
 
-const RATE_LIMIT_PATTERN = /you.ve hit your limit|out of extra usage/i;
-
 // Serial queue — prevents concurrent --resume on the same session
 // Global queue for non-thread messages (backward compatible)
 let globalQueue: Promise<unknown> = Promise.resolve();
@@ -77,23 +74,6 @@ function enqueue<T>(fn: () => Promise<T>, threadId?: string): Promise<T> {
   return task;
 }
 
-function extractRateLimitMessage(stdout: string, stderr: string): string | null {
-  const candidates = [stdout, stderr];
-  for (const text of candidates) {
-    const trimmed = text.trim();
-    if (trimmed && RATE_LIMIT_PATTERN.test(trimmed)) return trimmed;
-  }
-  return null;
-}
-
-function sameModelConfig(a: ModelConfig, b: ModelConfig): boolean {
-  return a.model.trim().toLowerCase() === b.model.trim().toLowerCase() && a.api.trim() === b.api.trim();
-}
-
-function hasModelConfig(value: ModelConfig): boolean {
-  return value.model.trim().length > 0 || value.api.trim().length > 0;
-}
-
 function isNotFoundError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const code = (error as { code?: unknown }).code;
@@ -102,18 +82,8 @@ function isNotFoundError(error: unknown): boolean {
   return /enoent|no such file or directory/i.test(message);
 }
 
-function buildChildEnv(baseEnv: Record<string, string>, model: string, api: string): Record<string, string> {
-  const childEnv: Record<string, string> = { ...baseEnv };
-  const normalizedModel = model.trim().toLowerCase();
-
-  if (api.trim()) childEnv.ANTHROPIC_AUTH_TOKEN = api.trim();
-
-  if (normalizedModel === "glm") {
-    childEnv.ANTHROPIC_BASE_URL = "https://api.z.ai/api/anthropic";
-    childEnv.API_TIMEOUT_MS = "3000000";
-  }
-
-  return childEnv;
+function buildChildEnv(baseEnv: Record<string, string>): Record<string, string> {
+  return { ...baseEnv };
 }
 
 /** Default timeout for a single Claude Code invocation (5 minutes). */
@@ -121,19 +91,15 @@ const CLAUDE_TIMEOUT_MS = 5 * 60 * 1000;
 
 async function runClaudeOnce(
   baseArgs: string[],
-  model: string,
-  api: string,
   baseEnv: Record<string, string>,
   timeoutMs: number = CLAUDE_TIMEOUT_MS
 ): Promise<{ rawStdout: string; stderr: string; exitCode: number }> {
   const args = [...baseArgs];
-  const normalizedModel = model.trim().toLowerCase();
-  if (model.trim() && normalizedModel !== "glm") args.push("--model", model.trim());
 
   const proc = Bun.spawn(args, {
     stdout: "pipe",
     stderr: "pipe",
-    env: buildChildEnv(baseEnv, model, api),
+    env: buildChildEnv(baseEnv),
   });
 
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -296,8 +262,6 @@ export async function loadHeartbeatPromptTemplate(): Promise<string> {
 /** Run /compact on the current session to reduce context size. */
 export async function runCompact(
   sessionId: string,
-  model: string,
-  api: string,
   baseEnv: Record<string, string>,
   securityArgs: string[],
   timeoutMs: number
@@ -309,7 +273,7 @@ export async function runCompact(
     ...securityArgs,
   ];
   console.log(`[${new Date().toLocaleTimeString()}] Running /compact on session ${sessionId.slice(0, 8)}...`);
-  const result = await runClaudeOnce(compactArgs, model, api, baseEnv, timeoutMs);
+  const result = await runClaudeOnce(compactArgs, baseEnv, timeoutMs);
   const success = result.exitCode === 0;
   console.log(`[${new Date().toLocaleTimeString()}] Compact ${success ? "succeeded" : `failed (exit ${result.exitCode})`}`);
   return success;
@@ -331,8 +295,6 @@ export async function compactCurrentSession(): Promise<{ success: boolean; messa
 
   const ok = await runCompact(
     existing.sessionId,
-    settings.model,
-    settings.api,
     baseEnv,
     securityArgs,
     timeoutMs
@@ -354,29 +316,7 @@ async function execClaude(name: string, prompt: string, threadId?: string): Prom
   const logFile = join(LOGS_DIR, `${name}-${timestamp}.log`);
 
   const settings = getSettings();
-  const { security, model, api, fallback, agentic } = settings;
-
-  // Determine which model to use based on agentic routing
-  let primaryConfig: ModelConfig;
-  let taskType = "unknown";
-  let routingReasoning = "";
-
-  if (agentic.enabled) {
-    const routing = selectModel(prompt, agentic.modes, agentic.defaultMode);
-    primaryConfig = { model: routing.model, api };
-    taskType = routing.taskType;
-    routingReasoning = routing.reasoning;
-    console.log(
-      `[${new Date().toLocaleTimeString()}] Agentic routing: ${routing.taskType} → ${routing.model} (${routing.reasoning})`
-    );
-  } else {
-    primaryConfig = { model, api };
-  }
-
-  const fallbackConfig: ModelConfig = {
-    model: fallback?.model ?? "",
-    api: fallback?.api ?? "",
-  };
+  const { security } = settings;
   const securityArgs = buildSecurityArgs(security);
   const timeoutMs = (settings as any).sessionTimeoutMs || CLAUDE_TIMEOUT_MS;
 
@@ -421,31 +361,16 @@ async function execClaude(name: string, prompt: string, threadId?: string): Prom
   const { CLAUDECODE: _, ...cleanEnv } = process.env;
   const baseEnv = { ...cleanEnv } as Record<string, string>;
 
-  let exec = await runClaudeOnce(args, primaryConfig.model, primaryConfig.api, baseEnv, timeoutMs);
-  const primaryRateLimit = extractRateLimitMessage(exec.rawStdout, exec.stderr);
-  let usedFallback = false;
-
-  if (primaryRateLimit && hasModelConfig(fallbackConfig) && !sameModelConfig(primaryConfig, fallbackConfig)) {
-    console.warn(
-      `[${new Date().toLocaleTimeString()}] Claude limit reached; retrying with fallback${fallbackConfig.model ? ` (${fallbackConfig.model})` : ""}...`
-    );
-    exec = await runClaudeOnce(args, fallbackConfig.model, fallbackConfig.api, baseEnv, timeoutMs);
-    usedFallback = true;
-  }
+  const exec = await runClaudeOnce(args, baseEnv, timeoutMs);
 
   const rawStdout = exec.rawStdout;
   const stderr = exec.stderr;
   const exitCode = exec.exitCode;
   let stdout = rawStdout;
   let sessionId = existing?.sessionId ?? "unknown";
-  const rateLimitMessage = extractRateLimitMessage(rawStdout, stderr);
-
-  if (rateLimitMessage) {
-    stdout = rateLimitMessage;
-  }
 
   // For new sessions, parse the JSON to extract session_id and result text
-  if (!rateLimitMessage && isNew && exitCode === 0) {
+  if (isNew && exitCode === 0) {
     try {
       const json = JSON.parse(rawStdout);
       sessionId = json.session_id;
@@ -473,8 +398,7 @@ async function execClaude(name: string, prompt: string, threadId?: string): Prom
     `# ${name}`,
     `Date: ${new Date().toISOString()}`,
     `Session: ${sessionId} (${isNew ? "new" : "resumed"})`,
-    `Model config: ${usedFallback ? "fallback" : "primary"}`,
-    ...(agentic.enabled ? [`Task type: ${taskType}`, `Routing: ${routingReasoning}`] : []),
+    `Model config: Claude Code default`,
     `Prompt: ${prompt}`,
     `Exit code: ${result.exitCode}`,
     "",
@@ -491,8 +415,6 @@ async function execClaude(name: string, prompt: string, threadId?: string): Prom
     emitCompactEvent({ type: "auto-compact-start" });
     const compactOk = await runCompact(
       existing.sessionId,
-      primaryConfig.model,
-      primaryConfig.api,
       baseEnv,
       securityArgs,
       timeoutMs
@@ -501,7 +423,7 @@ async function execClaude(name: string, prompt: string, threadId?: string): Prom
 
     if (compactOk) {
       console.log(`[${new Date().toLocaleTimeString()}] Retrying ${name} after compact...`);
-      const retryExec = await runClaudeOnce(args, primaryConfig.model, primaryConfig.api, baseEnv, timeoutMs);
+      const retryExec = await runClaudeOnce(args, baseEnv, timeoutMs);
       const retryResult: RunResult = {
         stdout: retryExec.rawStdout,
         stderr: retryExec.stderr,
@@ -554,7 +476,7 @@ async function streamClaude(
   await mkdir(LOGS_DIR, { recursive: true });
 
   const existing = await getSession();
-  const { security, model, api } = getSettings();
+  const { security } = getSettings();
   const securityArgs = buildSecurityArgs(security);
 
   // stream-json gives us events as they happen — text before tool calls,
@@ -580,11 +502,8 @@ async function streamClaude(
     args.push("--append-system-prompt", appendParts.join("\n\n"));
   }
 
-  const normalizedModel = model.trim().toLowerCase();
-  if (model.trim() && normalizedModel !== "glm") args.push("--model", model.trim());
-
   const { CLAUDECODE: _, ...cleanEnv } = process.env;
-  const childEnv = buildChildEnv(cleanEnv as Record<string, string>, model, api);
+  const childEnv = buildChildEnv(cleanEnv as Record<string, string>);
 
   console.log(`[${new Date().toLocaleTimeString()}] Running: ${name} (stream-json, session: ${existing?.sessionId?.slice(0, 8) ?? "new"})`);
 

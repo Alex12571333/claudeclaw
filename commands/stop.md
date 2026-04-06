@@ -1,5 +1,5 @@
 ---
-description: Stop the heartbeat daemon
+description: Остановить демон heartbeat
 ---
 
 Stop the heartbeat daemon by running:
