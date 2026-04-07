@@ -15,6 +15,7 @@ Display this help information to the user:
 - `/heartbeat:jobs` — Create, list, edit, or delete cron jobs
 - `/heartbeat:logs` — Show recent execution logs (accepts count or job name filter)
 - `/heartbeat:telegram` — Show Telegram bot status and sessions (use `clear` to reset sessions)
+- `/heartbeat:uninstall` — Stop daemon and remove ClaudeClaw local project data before uninstalling plugin
 - `/heartbeat:help` — Show this help message
 
 **Start command options (CLI):**
